@@ -14,11 +14,12 @@
     <description>Parent Maven project for the CarePlus learning application</description>
 
     <modules>
+    <module>common-service</module>
         <module>careplus-facade</module>
         <module>patient-service</module>
         <module>doctor-service</module>
         <module>appointment-service</module>
-        <module>common-service</module>
+        
     </modules>
 
     <properties>

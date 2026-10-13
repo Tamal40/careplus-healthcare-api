@@ -6,6 +6,7 @@
 const API_URLS = Object.freeze({
     AUTH: Object.freeze({
         LOGIN: "/api/auth/login",
+        GOOGLE_TOKEN: "/api/auth/google-token",
     }),
     PATIENTS: Object.freeze({
         BASE: "/api/patients/create",

@@ -42,9 +42,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	            "2. HEADER PRESENT = " + (authHeader != null)
 	    );
 
-	    if (authHeader == null ||
-	            !authHeader.startsWith("Bearer ") && request.getRequestURL().toString()
-	            .equals("/api/auth/login")) {
+	    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
 
 	        System.out.println("3. NO BEARER TOKEN");
 
@@ -74,8 +72,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	                "5. EXISTING AUTH = " + existing
 	        );
 
+	        // The session already holds the Google login (the gate to the UI), so existing is normally
+	        // that OAuth2 user, which has no PATIENT/DOCTOR/ADMIN role. A valid JWT must still take over for
+	        // this request, or every API call would be judged as the Google user and get 403.
 	        if (username != null &&
-	                existing == null) {
+	                !(existing instanceof UsernamePasswordAuthenticationToken)) {
 
 	            System.out.println(
 	                    "6. LOADING USER"
