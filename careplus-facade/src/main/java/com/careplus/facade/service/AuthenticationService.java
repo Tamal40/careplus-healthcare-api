@@ -34,4 +34,21 @@ public class AuthenticationService {
 			        return jwtService.generateToken(userDetails);
 	}
 
+	/** The result of a Google sign-in: the app's JWT plus the DB identity it was issued for. */
+	public record GoogleLogin(String token, String username, String role) {
+	}
+
+	/**
+	 * Signs in a user whose identity Google has already verified. Google stands in for the password check
+	 * only: the account must exist in the users table (username = Google email), and the JWT carries that
+	 * row's username and role, exactly as a username/password login would.
+	 *
+	 * @throws org.springframework.security.core.userdetails.UsernameNotFoundException when no such user exists
+	 */
+	public GoogleLogin loginWithGoogle(String email) {
+		UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+		String role = userDetails.getAuthorities().iterator().next().getAuthority().replaceFirst("^ROLE_", "");
+		return new GoogleLogin(jwtService.generateToken(userDetails), userDetails.getUsername(), role);
+	}
+
 }
