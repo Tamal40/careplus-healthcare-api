@@ -57,6 +57,34 @@ class RequestValidationTest {
 	}
 
 	@Test
+	void patientWithBlankRequiredFieldsIsInvalid() {
+		Patient patient = validPatient();
+		patient.setName("  ");
+		patient.setEmail("");
+		patient.setPhone(" ");
+
+		assertThat(invalidFields(validator.validate(patient))).containsExactlyInAnyOrder("name", "email", "phone");
+	}
+
+	@Test
+	void patientBornTodayIsValid() {
+		Patient patient = validPatient();
+		patient.setDate_of_birth(LocalDate.now());
+
+		assertThat(validator.validate(patient)).isEmpty();
+	}
+
+	@Test
+	void medicalRecordWithNullPrescriptionEntryIsInvalid() {
+		MedicalRecordRequest record = new MedicalRecordRequest();
+		record.setAppointment_id(7L);
+		record.setDiagnosis("Infection");
+		record.setPrescriptions(java.util.Arrays.asList((PrescriptionRequest)null));
+
+		assertThat(invalidFields(validator.validate(record))).containsExactly("prescriptions[0].<list element>");
+	}
+
+	@Test
 	void medicalRecordWithoutPrescriptionsIsValid() {
 		MedicalRecordRequest record = new MedicalRecordRequest();
 		record.setAppointment_id(7L);

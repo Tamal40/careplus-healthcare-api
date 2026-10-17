@@ -13,8 +13,8 @@ public class MedicalRecordRequest {
 	@NotBlank(message = "diagnosis is required")
 	    private String diagnosis;
 	    private String notes;
-	@Valid
-	    private List<PrescriptionRequest> prescriptions;
+	// @NotNull on the element: @Valid alone skips null entries, so [null] passed validation and then NPE'd.
+	    private List<@NotNull @Valid PrescriptionRequest> prescriptions;
 		public Long getAppointment_id() {
 			return appointment_id;
 		}

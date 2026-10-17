@@ -18,7 +18,7 @@ import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Past;
+import jakarta.validation.constraints.PastOrPresent;
 
 @Entity
 @Table(name="patient")
@@ -48,7 +48,7 @@ public class Patient implements Serializable {
 	@Column(nullable=false)
 	private String phone;
 	@NotNull(message = "date_of_birth is required")
-	@Past(message = "date_of_birth must be in the past")
+	@PastOrPresent(message = "date_of_birth cannot be in the future")
 	@Column(nullable=false)
 	private LocalDate date_of_birth;
 	@Enumerated(EnumType.STRING)
