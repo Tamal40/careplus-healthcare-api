@@ -1,8 +1,12 @@
 package com.careplus.patient.dto;
 
+import jakarta.validation.constraints.NotBlank;
+
 public class PrescriptionRequest {
 
+	@NotBlank(message = "medicine_name is required")
 	 private String medicine_name;
+	@NotBlank(message = "dosage is required")
 	    private String dosage;
 	    private String frequency;
 	    private String duration;

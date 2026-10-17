@@ -13,6 +13,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import com.careplus.common.dto.Appointment;
@@ -23,7 +24,9 @@ import com.careplus.common.dto.Patient;
 import com.careplus.common.dto.Prescription;
 import com.careplus.patient.dto.MedicalRecordRequest;
 import com.careplus.patient.dto.PrescriptionRequest;
+import com.careplus.patient.exception.AppointmentNotFoundException;
 import com.careplus.patient.exception.PatientExistsException;
+import com.careplus.patient.exception.PatientNotFoundException;
 import com.careplus.patient.repository.MedicalRecordRepository;
 import com.careplus.patient.repository.PatientRepository;
 import com.careplus.patient.repository.PrescriptionRepository;
@@ -59,7 +62,7 @@ public class PatientService {
 	@Transactional
 	public Patient getPatient(Long id) {
 		
-		return repo.findById(id).orElse(null);
+		return repo.findById(id).orElseThrow(() -> new PatientNotFoundException(id));
 	}
 	
 @Transactional
@@ -75,10 +78,7 @@ public Patient createPatient(Patient p) throws PatientExistsException {
 
 @Transactional
 public List<AppointmentDto> getAppointments(Long id) {
-	Patient p=repo.findById(id).orElse(null);
-	if(p==null) {
-		return null;
-	}
+	Patient p=repo.findById(id).orElseThrow(() -> new PatientNotFoundException(id));
 	List<Appointment> app=p.getAppointments();
 	List<AppointmentDto> appt=new ArrayList<>();
 	for(Appointment a:app) {
@@ -88,7 +88,8 @@ public List<AppointmentDto> getAppointments(Long id) {
 		ap.setReason(a.getReason());
 		ap.setCreated_at(a.getCreated_at());
 		ap.setUpdated_at(a.getUpdated_at());
-		ap.setStatus(a.getStatus().toString());
+		// Status is nullable on the entity; calling toString() on it threw for appointments without one.
+		ap.setStatus(a.getStatus() != null ? a.getStatus().name() : null);
 		appt.add(ap);
 	}
 	return appt;
@@ -101,16 +102,22 @@ public MedicalRecordRequest createRecord(MedicalRecordRequest record,String auth
 	HttpHeaders headers=new HttpHeaders();
 	headers.set(HttpHeaders.AUTHORIZATION, auth);
 	HttpEntity<Void> entity=new HttpEntity<>(headers);
-	AppointmentDto appointment = restTemplate.exchange(
-	        "http://localhost:8083/api/appointments/"
-	                + record.getAppointment_id(),
-	        HttpMethod.GET,
-	        entity,
-	        AppointmentDto.class
-	).getBody();
+	AppointmentDto appointment;
+	try {
+		appointment = restTemplate.exchange(
+		        "http://localhost:8083/api/appointments/"
+		                + record.getAppointment_id(),
+		        HttpMethod.GET,
+		        entity,
+		        AppointmentDto.class
+		).getBody();
+	} catch (HttpClientErrorException.NotFound ex) {
+		// appointment-service answers 404 for an unknown id; report it as such rather than as a 500.
+		throw new AppointmentNotFoundException(record.getAppointment_id());
+	}
 
 	if (appointment == null) {
-	    throw new RuntimeException("Appointment not found");
+	    throw new AppointmentNotFoundException(record.getAppointment_id());
 	}
 	MedicalRecord rec = new MedicalRecord();
 
@@ -124,7 +131,10 @@ public MedicalRecordRequest createRecord(MedicalRecordRequest record,String auth
 
 	MedicalRecord recc=medicalrepo.save(rec);
 	
-	for (PrescriptionRequest p : record.getPrescriptions()) {
+	// Prescriptions are optional: a medical record without any used to throw a NullPointerException here,
+	// after the record itself had already been saved.
+	List<PrescriptionRequest> prescriptions = record.getPrescriptions() != null ? record.getPrescriptions() : List.of();
+	for (PrescriptionRequest p : prescriptions) {
 
 	    Prescription prescription = new Prescription();
 
@@ -140,15 +150,13 @@ public MedicalRecordRequest createRecord(MedicalRecordRequest record,String auth
 }
 
 public List<MedicalRecordRequest> getMedicalHistory(Long id) {
+	// Spring Data returns an empty list, never null, so a patient with no history simply gets [].
 	List<MedicalRecord> med=medicalrepo.findByPatient_Id(id);
-	if(med==null) {
-		throw new RuntimeException("MedicalHistory not found");
-	}
 	List<MedicalRecordRequest> rec=new ArrayList<>();
 	for(MedicalRecord reco:med) {
 		MedicalRecordRequest req=new MedicalRecordRequest();
 		req.setDiagnosis(reco.getDiagnosis());
-		req.setNotes(reco.getDiagnosis());
+		req.setNotes(reco.getNotes());
 		req.setAppointment_id(reco.getAppointment().getId());
 		List<Prescription> pres=prescriptionrepo.findByid(reco.getId());
 		List<PrescriptionRequest> presc=new ArrayList<>();

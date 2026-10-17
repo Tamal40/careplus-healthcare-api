@@ -16,6 +16,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.PastOrPresent;
 
 @Entity
 @Table(name="patient")
@@ -28,9 +31,11 @@ public class Patient implements Serializable {
 	@Id
 	@GeneratedValue(strategy=GenerationType.IDENTITY)
 	private Long id;
+	@NotBlank(message = "name is required")
 	@Column(nullable=false)
 	private String name;
-	@Email
+	@NotBlank(message = "email is required")
+	@Email(message = "email must be a valid email address")
 	@Column(nullable=false)
 	private String email;
 	public String getEmail() {
@@ -39,8 +44,11 @@ public class Patient implements Serializable {
 	public void setEmail(String email) {
 		this.email = email;
 	}
+	@NotBlank(message = "phone is required")
 	@Column(nullable=false)
 	private String phone;
+	@NotNull(message = "date_of_birth is required")
+	@PastOrPresent(message = "date_of_birth cannot be in the future")
 	@Column(nullable=false)
 	private LocalDate date_of_birth;
 	@Enumerated(EnumType.STRING)

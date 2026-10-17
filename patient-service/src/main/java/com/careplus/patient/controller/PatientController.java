@@ -3,7 +3,6 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +12,8 @@ import com.careplus.patient.exception.PatientExistsException;
 import com.careplus.patient.service.PatientService;
 import org.springframework.http.HttpHeaders;
 import com.careplus.common.dto.*;
+
+import jakarta.validation.Valid;
 @RestController
 @RequestMapping("/api/patients")
 public class PatientController {
@@ -30,34 +31,27 @@ public class PatientController {
 	@GetMapping("/{id}")
 	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
 	public ResponseEntity<Patient> getPatient(@PathVariable("id") Long id){
-		Patient p1=service.getPatient(id);
-		if(p1==null) {
-			Patient p=new Patient();
-			return new ResponseEntity<Patient>(p,HttpStatusCode.valueOf(404));
-		}
-		return new ResponseEntity<Patient>(p1,HttpStatusCode.valueOf(200));
+		// An unknown id throws PatientNotFoundException, which PatientExceptionHandler maps to 404.
+		return ResponseEntity.ok(service.getPatient(id));
 	}
 	
 	@PostMapping("/create")
 	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
-	public ResponseEntity<Patient> createPatient(@RequestBody Patient patient) throws PatientExistsException{
+	public ResponseEntity<Patient> createPatient(@Valid @RequestBody Patient patient) throws PatientExistsException{
 		Patient p=service.createPatient(patient);
-		return new ResponseEntity<Patient>(p,HttpStatusCode.valueOf(201));
+		return ResponseEntity.status(HttpStatus.CREATED).body(p);
 	}
 	
 	@GetMapping("/{id}/appointments")
 	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
-	public ResponseEntity<List<AppointmentDto>> getAppointment(@PathVariable("id") Long id) throws PatientExistsException{
-		List<AppointmentDto> p=service.getAppointments(id);
-		if(p==null) {
-			return new ResponseEntity<List<AppointmentDto>>(p,HttpStatusCode.valueOf(404));
-		}
-		return new ResponseEntity<List<AppointmentDto>>(p,HttpStatusCode.valueOf(201));
+	public ResponseEntity<List<AppointmentDto>> getAppointment(@PathVariable("id") Long id){
+		// A read is 200 OK; this used to answer 201 Created. An unknown patient id is a 404 via the handler.
+		return ResponseEntity.ok(service.getAppointments(id));
 	}
 	
 	@PostMapping("/medical-records")
 	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
-	public ResponseEntity<MedicalRecordRequest> createMedicalRecord(@RequestBody MedicalRecordRequest record
+	public ResponseEntity<MedicalRecordRequest> createMedicalRecord(@Valid @RequestBody MedicalRecordRequest record
 			,  @RequestHeader(HttpHeaders.AUTHORIZATION) String auth) throws PatientExistsException{
 		  MedicalRecordRequest response =
 	                service.createRecord(record, auth);
