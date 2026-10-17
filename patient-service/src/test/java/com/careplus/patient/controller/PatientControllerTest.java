@@ -81,6 +81,16 @@ class PatientControllerTest {
 	}
 
 	@Test
+	void appointmentsOfUnknownPatientIsA404WithAnErrorBody() throws Exception {
+		when(service.getAppointments(99L)).thenThrow(new PatientNotFoundException(99L));
+
+		mvc.perform(get("/api/patients/99/appointments"))
+				.andExpect(status().isNotFound())
+				.andExpect(jsonPath("$.status", is(404)))
+				.andExpect(jsonPath("$.message", is("Patient 99 not found")));
+	}
+
+	@Test
 	void invalidPatientIsA400WithFieldErrorsAndIsNotSaved() throws Exception {
 		mvc.perform(post("/api/patients/create").contentType(MediaType.APPLICATION_JSON)
 						.content("{\"name\":\" \",\"email\":\"not-an-email\",\"phone\":\"9000000000\",\"date_of_birth\":\"1990-01-01\"}"))
