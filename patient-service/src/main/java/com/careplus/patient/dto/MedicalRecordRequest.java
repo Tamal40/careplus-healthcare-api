@@ -2,11 +2,18 @@ package com.careplus.patient.dto;
 
 import java.util.List;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+
 public class MedicalRecordRequest {
 	
+	@NotNull(message = "appointment_id is required")
 	 private Long appointment_id;
+	@NotBlank(message = "diagnosis is required")
 	    private String diagnosis;
 	    private String notes;
+	@Valid
 	    private List<PrescriptionRequest> prescriptions;
 		public Long getAppointment_id() {
 			return appointment_id;

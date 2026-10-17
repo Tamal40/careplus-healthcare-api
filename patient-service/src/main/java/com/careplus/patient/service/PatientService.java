@@ -24,6 +24,7 @@ import com.careplus.common.dto.Prescription;
 import com.careplus.patient.dto.MedicalRecordRequest;
 import com.careplus.patient.dto.PrescriptionRequest;
 import com.careplus.patient.exception.PatientExistsException;
+import com.careplus.patient.exception.PatientNotFoundException;
 import com.careplus.patient.repository.MedicalRecordRepository;
 import com.careplus.patient.repository.PatientRepository;
 import com.careplus.patient.repository.PrescriptionRepository;
@@ -59,7 +60,7 @@ public class PatientService {
 	@Transactional
 	public Patient getPatient(Long id) {
 		
-		return repo.findById(id).orElse(null);
+		return repo.findById(id).orElseThrow(() -> new PatientNotFoundException(id));
 	}
 	
 @Transactional
@@ -75,10 +76,7 @@ public Patient createPatient(Patient p) throws PatientExistsException {
 
 @Transactional
 public List<AppointmentDto> getAppointments(Long id) {
-	Patient p=repo.findById(id).orElse(null);
-	if(p==null) {
-		return null;
-	}
+	Patient p=repo.findById(id).orElseThrow(() -> new PatientNotFoundException(id));
 	List<Appointment> app=p.getAppointments();
 	List<AppointmentDto> appt=new ArrayList<>();
 	for(Appointment a:app) {
@@ -124,7 +122,10 @@ public MedicalRecordRequest createRecord(MedicalRecordRequest record,String auth
 
 	MedicalRecord recc=medicalrepo.save(rec);
 	
-	for (PrescriptionRequest p : record.getPrescriptions()) {
+	// Prescriptions are optional: a medical record without any used to throw a NullPointerException here,
+	// after the record itself had already been saved.
+	List<PrescriptionRequest> prescriptions = record.getPrescriptions() != null ? record.getPrescriptions() : List.of();
+	for (PrescriptionRequest p : prescriptions) {
 
 	    Prescription prescription = new Prescription();
 
