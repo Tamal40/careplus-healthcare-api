@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -72,11 +73,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	                "5. EXISTING AUTH = " + existing
 	        );
 
-	        // The session already holds the Google login (the gate to the UI), so existing is normally
-	        // that OAuth2 user, which has no PATIENT/DOCTOR/ADMIN role. A valid JWT must still take over for
-	        // this request, or every API call would be judged as the Google user and get 403.
-	        if (username != null &&
-	                !(existing instanceof UsernamePasswordAuthenticationToken)) {
+	        // A valid Bearer token always decides who this request runs as. The session may hold the Google login
+	        // (the gate to the UI), which has no PATIENT/DOCTOR/ADMIN role, and must never stop a different user's
+	        // token from taking effect.
+	        if (username != null) {
 
 	            System.out.println(
 	                    "6. LOADING USER"
@@ -115,9 +115,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	                                userDetails.getAuthorities()
 	                        );
 
-	                SecurityContextHolder
-	                        .getContext()
-	                        .setAuthentication(auth);
+	                // A fresh context, not getContext().setAuthentication(...): with sessions enabled the current
+	                // context is the object stored in the HTTP session, so mutating it saved this JWT user into
+	                // the session and later requests ran as them with no token at all.
+	                SecurityContext context = SecurityContextHolder.createEmptyContext();
+	                context.setAuthentication(auth);
+	                SecurityContextHolder.setContext(context);
 
 	                System.out.println(
 	                        "10. AUTHENTICATION SET"

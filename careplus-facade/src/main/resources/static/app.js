@@ -160,13 +160,22 @@ $("loginForm").addEventListener("submit", async (event) => {
     }
 });
 
-$("logoutBtn").addEventListener("click", () => {
+$("logoutBtn").addEventListener("click", async () => {
     jwt = "";
     sessionStorage.removeItem("careplus_jwt");
     $("password").value = "";
 
     setSignedIn(false);
-    showMessage("You have been logged out.");
+
+    // Clearing the JWT alone is not a logout: the server-side Google session survives, and the next page
+    // load would exchange it for a new JWT and sign the same user straight back in. Spring Security's
+    // logout invalidates that session; its /login?logout page then offers sign-in again without doing it.
+    try {
+        await fetch(`${getBaseUrl()}/logout`, { method: "POST" });
+    } catch {
+        // Fall through: the redirect below still leaves the user signed out in this tab.
+    }
+    window.location.href = `${getBaseUrl()}/login?logout`;
 });
 
 if (jwt) {
