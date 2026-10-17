@@ -1,5 +1,6 @@
 package com.careplus.patient.controller;
 
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -103,7 +104,10 @@ class PatientControllerTest {
 		mvc.perform(post("/api/patients/medical-records").contentType(MediaType.APPLICATION_JSON)
 						.header(HttpHeaders.AUTHORIZATION, "Bearer token")
 						.content("{\"appointment_id\":7,\"diagnosis\":\"Infection\",\"prescriptions\":[null]}"))
-				.andExpect(status().isBadRequest());
+				.andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.message", is("Request validation failed")))
+				// Proves the 400 comes from the @NotNull on the list element, not from some other cause.
+				.andExpect(jsonPath("$.fieldErrors.*", hasItem("prescription entries must not be null")));
 
 		verify(service, never()).createRecord(any(), any());
 	}

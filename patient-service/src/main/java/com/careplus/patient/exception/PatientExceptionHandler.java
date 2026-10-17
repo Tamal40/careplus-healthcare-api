@@ -47,13 +47,19 @@ public class PatientExceptionHandler {
 	}
 
 	/**
-	 * appointment-service failed in a way other than an unknown id (which becomes AppointmentNotFoundException).
-	 * That is an upstream problem, not the caller's, so it is a 502; its body is not passed through.
+	 * A call to another service (appointment-service) failed in a way other than an unknown appointment, which
+	 * createRecord turns into AppointmentNotFoundException first. A 4xx keeps its status, because it is usually about
+	 * the caller (a forwarded token rejected with 401/403, or a bad id), and only a 5xx is reported as 502. Mapping
+	 * everything to 502 made an auth failure look like an outage. The downstream body is never passed through.
 	 */
 	@ExceptionHandler(RestClientResponseException.class)
-	public ResponseEntity<ErrorResponse> appointmentServiceError(RestClientResponseException ex) {
-		LOGGER.error("appointment-service call failed with {}", ex.getStatusCode(), ex);
-		return error(HttpStatus.BAD_GATEWAY, "Appointment service request failed");
+	public ResponseEntity<ErrorResponse> downstreamServiceError(RestClientResponseException ex) {
+		LOGGER.error("Downstream service call failed with {}", ex.getStatusCode(), ex);
+		HttpStatus upstream = HttpStatus.resolve(ex.getStatusCode().value());
+		if (upstream != null && upstream.is4xxClientError()) {
+			return error(upstream, "Downstream service rejected the request");
+		}
+		return error(HttpStatus.BAD_GATEWAY, "Downstream service request failed");
 	}
 
 	/** Bean Validation failures on a {@code @Valid} request body, reported per field. */

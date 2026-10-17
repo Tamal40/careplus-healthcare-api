@@ -14,6 +14,7 @@ import org.springframework.mock.http.MockHttpInputMessage;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.HttpServerErrorException;
 
 import com.careplus.common.dto.Patient;
@@ -75,12 +76,21 @@ class PatientExceptionHandlerTest {
 	}
 
 	@Test
-	void appointmentServiceFailureIsBadGatewayWithoutItsBody() {
-		ResponseEntity<ErrorResponse> response = handler.appointmentServiceError(HttpServerErrorException.create(
+	void downstreamServerErrorIsBadGatewayWithoutItsBody() {
+		ResponseEntity<ErrorResponse> response = handler.downstreamServiceError(HttpServerErrorException.create(
 				HttpStatus.SERVICE_UNAVAILABLE, "Service Unavailable", HttpHeaders.EMPTY, "stack trace here".getBytes(), null));
 
 		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_GATEWAY);
-		assertThat(response.getBody().message()).isEqualTo("Appointment service request failed").doesNotContain("stack trace");
+		assertThat(response.getBody().message()).isEqualTo("Downstream service request failed").doesNotContain("stack trace");
+	}
+
+	@Test
+	void downstreamClientErrorKeepsItsStatus() {
+		ResponseEntity<ErrorResponse> response = handler.downstreamServiceError(HttpClientErrorException.create(
+				HttpStatus.FORBIDDEN, "Forbidden", HttpHeaders.EMPTY, new byte[0], null));
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+		assertThat(response.getBody().message()).isEqualTo("Downstream service rejected the request");
 	}
 
 	@SuppressWarnings("unused")

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -18,6 +19,7 @@ import java.util.Optional;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,6 +33,7 @@ import org.springframework.web.client.RestTemplate;
 
 import com.careplus.common.dto.Appointment;
 import com.careplus.common.dto.AppointmentDto;
+import com.careplus.common.dto.Doctor;
 import com.careplus.common.dto.Patient;
 import com.careplus.common.dto.MedicalRecord;
 import com.careplus.common.dto.Prescription;
@@ -157,8 +160,31 @@ class PatientServiceTest {
 	}
 
 	@Test
-	void createRecordSavesEachPrescription() {
+	void createRecordLinksRecordToTheAppointmentsPatientAndDoctor() {
 		stubAppointmentLookup(7L);
+		MedicalRecordRequest request = new MedicalRecordRequest();
+		request.setAppointment_id(7L);
+		request.setDiagnosis("Infection");
+		request.setNotes("Rest for a week");
+
+		service.createRecord(request, "Bearer token");
+
+		// Ids come from the AppointmentDto: appointment 7, patient 1, doctor 2. Swapping them must fail.
+		verify(entityManager).getReference(Appointment.class, 7L);
+		verify(entityManager).getReference(Patient.class, 1L);
+		verify(entityManager).getReference(Doctor.class, 2L);
+		ArgumentCaptor<MedicalRecord> saved = ArgumentCaptor.forClass(MedicalRecord.class);
+		verify(medicalrepo).save(saved.capture());
+		assertThat(saved.getValue().getDiagnosis()).isEqualTo("Infection");
+		assertThat(saved.getValue().getNotes()).isEqualTo("Rest for a week");
+	}
+
+	@Test
+	void createRecordSavesEachPrescriptionLinkedToTheRecord() {
+		stubAppointmentLookup(7L);
+		MedicalRecord recordReference = new MedicalRecord();
+		// Lenient: createRecord also calls getReference for the appointment, patient and doctor.
+		lenient().when(entityManager.getReference(MedicalRecord.class, 50L)).thenReturn(recordReference);
 		MedicalRecordRequest request = new MedicalRecordRequest();
 		request.setAppointment_id(7L);
 		request.setDiagnosis("Infection");
@@ -166,7 +192,61 @@ class PatientServiceTest {
 
 		service.createRecord(request, "Bearer token");
 
-		verify(prescriptionrepo, times(2)).save(any(Prescription.class));
+		ArgumentCaptor<Prescription> saved = ArgumentCaptor.forClass(Prescription.class);
+		verify(prescriptionrepo, times(2)).save(saved.capture());
+		assertThat(saved.getAllValues()).extracting(Prescription::getMedicine_name).containsExactly("Amoxicillin", "Paracetamol");
+		assertThat(saved.getAllValues()).extracting(Prescription::getDosage).containsOnly("500mg");
+		assertThat(saved.getAllValues()).extracting(Prescription::getMedicalRecord).containsOnly(recordReference);
+	}
+
+	@Test
+	void createRecordForwardsTheCallersAuthorizationHeader() {
+		stubAppointmentLookup(7L);
+		MedicalRecordRequest request = new MedicalRecordRequest();
+		request.setAppointment_id(7L);
+		request.setDiagnosis("Infection");
+
+		service.createRecord(request, "Bearer caller-token");
+
+		ArgumentCaptor<String> url = ArgumentCaptor.forClass(String.class);
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<HttpEntity<Void>> entity = ArgumentCaptor.forClass(HttpEntity.class);
+		verify(restTemplate).exchange(url.capture(), eq(HttpMethod.GET), entity.capture(), eq(AppointmentDto.class));
+		assertThat(url.getValue()).endsWith("/api/appointments/7");
+		assertThat(entity.getValue().getHeaders().getFirst(HttpHeaders.AUTHORIZATION)).isEqualTo("Bearer caller-token");
+	}
+
+	@Test
+	void getMedicalHistoryMapsNotesAndPrescriptions() {
+		Appointment appointment = new Appointment();
+		appointment.setId(7L);
+		MedicalRecord record = new MedicalRecord();
+		record.setId(50L);
+		record.setAppointment(appointment);
+		record.setDiagnosis("Infection");
+		record.setNotes("Rest for a week");
+		Prescription prescription = new Prescription();
+		prescription.setMedicine_name("Amoxicillin");
+		prescription.setDosage("500mg");
+		when(medicalrepo.findByPatient_Id(1L)).thenReturn(List.of(record));
+		when(prescriptionrepo.findByid(50L)).thenReturn(List.of(prescription));
+
+		List<MedicalRecordRequest> history = service.getMedicalHistory(1L);
+
+		assertThat(history).hasSize(1);
+		MedicalRecordRequest entry = history.get(0);
+		assertThat(entry.getDiagnosis()).isEqualTo("Infection");
+		// Notes used to be filled from the diagnosis.
+		assertThat(entry.getNotes()).isEqualTo("Rest for a week");
+		assertThat(entry.getAppointment_id()).isEqualTo(7L);
+		assertThat(entry.getPrescriptions()).extracting(PrescriptionRequest::getMedicine_name).containsExactly("Amoxicillin");
+	}
+
+	@Test
+	void getMedicalHistoryForPatientWithoutRecordsIsEmpty() {
+		when(medicalrepo.findByPatient_Id(1L)).thenReturn(List.of());
+
+		assertThat(service.getMedicalHistory(1L)).isEmpty();
 	}
 
 	@Test

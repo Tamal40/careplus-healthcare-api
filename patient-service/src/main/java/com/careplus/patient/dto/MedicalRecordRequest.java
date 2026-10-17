@@ -14,7 +14,7 @@ public class MedicalRecordRequest {
 	    private String diagnosis;
 	    private String notes;
 	// @NotNull on the element: @Valid alone skips null entries, so [null] passed validation and then NPE'd.
-	    private List<@NotNull @Valid PrescriptionRequest> prescriptions;
+	    private List<@NotNull(message = "prescription entries must not be null") @Valid PrescriptionRequest> prescriptions;
 		public Long getAppointment_id() {
 			return appointment_id;
 		}
