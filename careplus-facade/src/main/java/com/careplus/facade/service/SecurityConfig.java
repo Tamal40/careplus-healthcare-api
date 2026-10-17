@@ -44,8 +44,11 @@ public class SecurityConfig {
 	@Bean
 	public SecurityFilterChain chain(HttpSecurity http) {
 		http.csrf(c->c.disable())
+		// The Google login is the gate to the UI and must be remembered between requests, so it lives in the
+		// session. STATELESS dropped it after the callback and sent the browser back to Google in a loop.
+		// API authorization still comes from the JWT that the sign-in screen gets from /api/auth/login.
 		.sessionManagement(se->se.sessionCreationPolicy(
-				SessionCreationPolicy.STATELESS))
+				SessionCreationPolicy.IF_REQUIRED))
 		.authorizeHttpRequests(auth->auth
 		 .requestMatchers(
                  "/oauth2/**",

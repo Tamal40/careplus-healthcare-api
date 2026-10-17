@@ -160,13 +160,22 @@ $("loginForm").addEventListener("submit", async (event) => {
     }
 });
 
-$("logoutBtn").addEventListener("click", () => {
+$("logoutBtn").addEventListener("click", async () => {
     jwt = "";
     sessionStorage.removeItem("careplus_jwt");
     $("password").value = "";
 
     setSignedIn(false);
-    showMessage("You have been logged out.");
+
+    // Clearing the JWT alone is not a logout: the server-side Google session survives, and the next page
+    // load would exchange it for a new JWT and sign the same user straight back in. Spring Security's
+    // logout invalidates that session; its /login?logout page then offers sign-in again without doing it.
+    try {
+        await fetch(`${getBaseUrl()}/logout`, { method: "POST" });
+    } catch {
+        // Fall through: the redirect below still leaves the user signed out in this tab.
+    }
+    window.location.href = `${getBaseUrl()}/login?logout`;
 });
 
 if (jwt) {
@@ -174,6 +183,35 @@ if (jwt) {
     $("welcomeUser").textContent = "Signed in (restored for this tab)";
 } else {
     setSignedIn(false);
+    signInWithGoogleSession();
+}
+
+/**
+ * After Google sign-in, exchanges the Google session for a CarePlus JWT. When the Google email matches a
+ * user in the database the user is signed in directly, with that user's username and role; otherwise the
+ * username/password screen stays visible.
+ */
+async function signInWithGoogleSession() {
+    try {
+        const response = await fetch(`${getBaseUrl()}${API_URLS.AUTH.GOOGLE_TOKEN}`);
+        if (!response.ok) {
+            if (response.status === 404) {
+                showMessage("Your Google account is not registered in CarePlus. Sign in with username and password.", true);
+            }
+            return;
+        }
+        const login = await response.json();
+        if (!login?.token) {
+            return;
+        }
+        jwt = login.token;
+        sessionStorage.setItem("careplus_jwt", jwt);
+        $("welcomeUser").textContent = `Signed in as ${login.username} (${login.role})`;
+        setSignedIn(true);
+        showMessage("Signed in with Google.");
+    } catch {
+        // No Google session available; the username/password screen stays visible.
+    }
 }
 
 /* -------------------------------------------------------------------------- */
