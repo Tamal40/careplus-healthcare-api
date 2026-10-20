@@ -25,6 +25,9 @@ public class SecurityConfig {
 	
 	@Autowired
 	JwtAuthenticationFilter jwtFilter;
+	
+	@Autowired
+	CustomAuthRequestResolver resolver;
 	@Bean
 	public PasswordEncoder encoder() {
 		return new BCryptPasswordEncoder();
@@ -88,9 +91,19 @@ public class SecurityConfig {
 		.anyRequest()
 		.authenticated()).
 		oauth2Login(oauth -> oauth
-                .defaultSuccessUrl("/", true)
-            )
-		.addFilterBefore(jwtFilter, 
+	            .authorizationEndpoint(endpoint ->
+	                endpoint.authorizationRequestResolver(resolver)
+	            )
+	            .defaultSuccessUrl("/", true)
+	        )
+		.logout(logout -> logout
+	            .logoutUrl("/logout")
+	            .invalidateHttpSession(true)
+	            .clearAuthentication(true)
+	            .deleteCookies("JSESSIONID")
+	            .logoutSuccessUrl("/oauth2/authorization/google")
+	            .permitAll()
+	        )	.addFilterBefore(jwtFilter, 
 				UsernamePasswordAuthenticationFilter.class);
 		;
 		return http.build();

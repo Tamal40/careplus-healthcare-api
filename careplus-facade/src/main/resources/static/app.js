@@ -160,13 +160,25 @@ $("loginForm").addEventListener("submit", async (event) => {
     }
 });
 
-$("logoutBtn").addEventListener("click", () => {
+$("logoutBtn").addEventListener("click", async () => {
+
     jwt = "";
+
     sessionStorage.removeItem("careplus_jwt");
+    sessionStorage.removeItem("careplus_base_url");
+
+    $("username").value = "";
     $("password").value = "";
 
-    setSignedIn(false);
-    showMessage("You have been logged out.");
+    try {
+        await fetch("/logout", {
+            method: "POST",
+            credentials: "same-origin"
+        });
+    } finally {
+        window.location.href =
+            "/oauth2/authorization/google";
+    }
 });
 
 if (jwt) {
