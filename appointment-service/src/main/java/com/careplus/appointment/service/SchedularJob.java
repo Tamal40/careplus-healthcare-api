@@ -12,6 +12,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -32,8 +33,12 @@ public class SchedularJob {
 	@Autowired
 	private AppointmentService service;
 	
+	@Value("${isEnable:false}")
+	private String enableFlag;
+	
 	@Scheduled(cron = "0 * * * * *")
 	public void bookAppointment() {
+		if(enableFlag=="true") {
 		AppointmentDto app=new AppointmentDto();
 		app.setDoctor_id(1L);
 		app.setPatient_id(1L);
@@ -71,6 +76,7 @@ public class SchedularJob {
 		}
 
 		ex.shutdown();
+		}
 		
 	}
 

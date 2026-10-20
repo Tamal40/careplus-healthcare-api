@@ -87,7 +87,53 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;p
                 </select>
             </div>
 <div class="row" style="margin-top:12px"><button type="submit">Save doctor</button><button type="button" class="secondary" id="resetDoctor">Clear</button></div></form><p class="small">POST /api/doctors · PUT /api/doctors/{id}</p></div>
-<div class="card"><h2>Find doctor / availability</h2><div class="row"><div class="field"><label for="doctorLookupId">Doctor ID</label><input id="doctorLookupId"></div><button id="findDoctorBtn">Find</button></div><div id="doctorLookupResult" class="notice hidden"></div>
+<div class="card"><h2>Find doctor / availability</h2>
+<h3 style="margin-top:18px">Add doctor availability</h3>
+
+<form id="availabilityForm">
+    <div class="row">
+        <div class="field">
+            <label for="availabilityCreateDoctorId">Doctor ID *</label>
+            <input id="availabilityCreateDoctorId" type="number" min="1" required>
+        </div>
+
+        <div class="field">
+            <label for="availabilityDate">Available date *</label>
+            <input id="availabilityDate" type="date" required>
+        </div>
+    </div>
+
+    <div class="row" style="margin-top:10px">
+        <div class="field">
+            <label for="availabilityStartTime">Start time *</label>
+            <input id="availabilityStartTime" type="time" required>
+        </div>
+
+        <div class="field">
+            <label for="availabilityEndTime">End time *</label>
+            <input id="availabilityEndTime" type="time" required>
+        </div>
+
+        <div class="field">
+            <label for="availabilityMaxAppointments">Max appointments *</label>
+            <input id="availabilityMaxAppointments"
+                   type="number"
+                   min="1"
+                   required>
+        </div>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+        <button type="submit">Add availability</button>
+        <button type="reset" class="secondary">Clear</button>
+    </div>
+</form>
+
+<div id="availabilityCreateResult" class="notice hidden"></div>
+
+<p class="small">
+    POST /api/doctors/{id}/availability
+</p><div class="row"><div class="field"><label for="doctorLookupId">Doctor ID</label><input id="doctorLookupId"></div><button id="findDoctorBtn">Find</button></div><div id="doctorLookupResult" class="notice hidden"></div>
 <div class="row" style="margin-top:18px"><div class="field"><label for="availabilityDoctorId">Doctor ID for availability</label><input id="availabilityDoctorId"></div><button id="availabilityBtn" class="secondary">Check availability</button></div><div id="availabilityResult" class="notice hidden"></div></div>
 </div></section>
 <section id="appointments" class="tabPanel hidden"><div class="grid">
@@ -105,7 +151,104 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;p
 <div class="field" style="margin-top:10px"><label for="appointmentReason">Reason / notes</label><textarea id="appointmentReason"></textarea></div><div class="row" style="margin-top:12px"><button type="submit">Book appointment</button><button type="reset" class="secondary">Clear</button></div></form><p class="small">POST /api/appointments. Payload field names may need to match your DTO.</p></div>
 <div class="card"><h2>Manage appointment</h2><div class="field"><label for="manageAppointmentId">Appointment ID</label><input id="manageAppointmentId"></div><div class="row" style="margin-top:10px"><button id="getAppointmentBtn" class="secondary">Find</button><button id="cancelAppointmentBtn" class="danger">Cancel</button><button id="completeAppointmentBtn" class="success">Complete</button></div><div id="appointmentResult" class="notice hidden"></div></div></div>
 <div class="card"><h2>Appointments by patient or doctor</h2><div class="row"><div class="field"><label for="appointmentsPatientId">Patient ID</label><input id="appointmentsPatientId"></div><button id="patientAppointmentsBtn" class="secondary">Show patient appointments</button><div class="field"><label for="appointmentsDoctorId">Doctor ID</label><input id="appointmentsDoctorId"></div><button id="doctorAppointmentsBtn" class="secondary">Show doctor appointments</button></div><div id="appointmentsList" style="margin-top:14px"></div></div></section>
-<section id="history" class="tabPanel hidden"><div class="card"><h2>Patient medical history</h2><div class="row"><div class="field"><label for="historyPatientId">Patient ID</label><input id="historyPatientId"></div><button id="historyBtn">Load medical history</button></div><div id="historyResult" class="notice hidden"></div><p class="small">GET /api/patients/{id}/medical-history; backend must implement this endpoint.</p></div></section>
+<section id="history" class="tabPanel hidden">
+    <div class="grid">
+
+        <div class="card">
+            <h2>Add medical record</h2>
+
+            <form id="medicalRecordForm">
+
+                <div class="field">
+                    <label for="medicalAppointmentId">Appointment ID *</label>
+                    <input id="medicalAppointmentId"
+                           type="number"
+                           min="1"
+                           required>
+                </div>
+
+                <div class="field" style="margin-top:10px">
+                    <label for="medicalDiagnosis">Diagnosis *</label>
+                    <input id="medicalDiagnosis"
+                           required
+                           placeholder="e.g. Viral fever">
+                </div>
+
+                <div class="field" style="margin-top:10px">
+                    <label for="medicalNotes">Notes</label>
+                    <textarea id="medicalNotes"
+                              placeholder="Clinical notes"></textarea>
+                </div>
+
+                <h3 style="margin-top:18px">Prescription</h3>
+
+                <div class="row">
+                    <div class="field">
+                        <label for="medicineName">Medicine name</label>
+                        <input id="medicineName"
+                               placeholder="e.g. Paracetamol">
+                    </div>
+
+                    <div class="field">
+                        <label for="medicineDosage">Dosage</label>
+                        <input id="medicineDosage"
+                               placeholder="e.g. 500mg">
+                    </div>
+                </div>
+
+                <div class="row" style="margin-top:10px">
+                    <div class="field">
+                        <label for="medicineFrequency">Frequency</label>
+                        <input id="medicineFrequency"
+                               placeholder="e.g. Twice daily">
+                    </div>
+
+                    <div class="field">
+                        <label for="medicineDuration">Duration</label>
+                        <input id="medicineDuration"
+                               placeholder="e.g. 5 days">
+                    </div>
+                </div>
+
+                <div class="row" style="margin-top:14px">
+                    <button type="submit">Add medical record</button>
+                    <button type="reset" class="secondary">Clear</button>
+                </div>
+
+            </form>
+
+            <div id="medicalRecordResult"
+                 class="notice hidden"></div>
+
+            <p class="small">
+                POST /api/patients/medical-records
+            </p>
+        </div>
+
+        <div class="card">
+            <h2>Patient medical history</h2>
+
+            <div class="row">
+                <div class="field">
+                    <label for="historyPatientId">Patient ID</label>
+                    <input id="historyPatientId">
+                </div>
+
+                <button id="historyBtn">
+                    Load medical history
+                </button>
+            </div>
+
+            <div id="historyResult"
+                 class="notice hidden"></div>
+
+            <p class="small">
+                GET /api/patients/{id}/medical-history
+            </p>
+        </div>
+
+    </div>
+</section>
 </div>
 <footer class="small" style="padding:8px 2px 24px">CarePlus learning UI · Development demo only; do not use real patient data.</footer>
 </main><script src="constants.js"></script>

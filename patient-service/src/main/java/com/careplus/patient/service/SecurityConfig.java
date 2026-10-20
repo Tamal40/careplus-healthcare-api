@@ -27,7 +27,7 @@ public class SecurityConfig {
          )
      )
 		.authorizeHttpRequests(
-				req->req.requestMatchers( "/actuator/health")
+				req->req.requestMatchers( "/health")
 				.permitAll()
 				.requestMatchers(
 		                "/",

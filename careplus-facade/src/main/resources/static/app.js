@@ -360,7 +360,40 @@ $("findDoctorBtn").addEventListener("click", async () => {
         showMessage(error.message, true);
     }
 });
+$("availabilityForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
 
+    const doctorId = $("availabilityCreateDoctorId").value.trim();
+
+    if (!doctorId) {
+        showMessage("Doctor ID is required.", true);
+        return;
+    }
+
+    const payload = {
+        available_date: $("availabilityDate").value,
+        start_time: $("availabilityStartTime").value,
+        end_time: $("availabilityEndTime").value,
+        max_appoinments: Number($("availabilityMaxAppointments").value)
+    };
+
+    try {
+        const availability = await apiRequest(
+            API_URLS.DOCTORS.AVAILABILITY(doctorId),
+            {
+                method: "POST",
+                body: JSON.stringify(payload)
+            }
+        );
+
+        showResult("availabilityCreateResult", availability);
+        showMessage("Doctor availability added successfully.");
+
+        $("availabilityForm").reset();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+});
 $("availabilityBtn").addEventListener("click", async () => {
     const doctorId = encodeURIComponent(
         $("availabilityDoctorId").value.trim()
@@ -564,7 +597,65 @@ $("doctorAppointmentsBtn").addEventListener("click", async () => {
 /* -------------------------------------------------------------------------- */
 /* Medical history                                                            */
 /* -------------------------------------------------------------------------- */
+$("medicalRecordForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
 
+    const appointmentId = $("medicalAppointmentId").value.trim();
+    const diagnosis = $("medicalDiagnosis").value.trim();
+    const notes = $("medicalNotes").value.trim();
+
+    const medicineName = $("medicineName").value.trim();
+    const dosage = $("medicineDosage").value.trim();
+    const frequency = $("medicineFrequency").value.trim();
+    const duration = $("medicineDuration").value.trim();
+
+    if (!appointmentId) {
+        showMessage("Appointment ID is required.", true);
+        return;
+    }
+
+    if (!diagnosis) {
+        showMessage("Diagnosis is required.", true);
+        return;
+    }
+
+    const prescriptions = [];
+
+    // Add a prescription only when at least one prescription field
+    // has been entered.
+    if (medicineName || dosage || frequency || duration) {
+        prescriptions.push({
+            medicine_name: medicineName,
+            dosage: dosage,
+            frequency: frequency,
+            duration: duration
+        });
+    }
+
+    const payload = {
+        appointment_id: Number(appointmentId),
+        diagnosis: diagnosis,
+        notes: notes,
+        prescriptions: prescriptions
+    };
+
+    try {
+        const record = await apiRequest(
+            API_URLS.PATIENTS.MEDICAL_RECORDS,
+            {
+                method: "POST",
+                body: JSON.stringify(payload)
+            }
+        );
+
+        showResult("medicalRecordResult", record);
+        showMessage("Medical record added successfully.");
+
+        $("medicalRecordForm").reset();
+    } catch (error) {
+        showMessage(error.message, true);
+    }
+});
 $("historyBtn").addEventListener("click", async () => {
     const patientId = encodeURIComponent(
         $("historyPatientId").value.trim()

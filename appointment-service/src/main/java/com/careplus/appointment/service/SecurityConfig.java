@@ -33,7 +33,7 @@ public class SecurityConfig {
 			                "/css/**",
 			                "/js/**"
 			            ).permitAll()
-				  .requestMatchers("/actuator/health").permitAll()
+				  .requestMatchers("/health").permitAll()
 				  .anyRequest().authenticated())
 		  .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
 		  .build();

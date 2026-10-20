@@ -26,10 +26,17 @@ import jakarta.persistence.EntityManager;
 import com.careplus.common.dto.Appointment;
 import com.careplus.common.dto.Doctor;
 import com.careplus.common.dto.DoctorAvialability;
+import org.springframework.beans.factory.annotation.Value;
 
 @Service
 @Transactional
 public class AppointmentService {
+
+	@Value("${services.patient.url:http://localhost:8081}")
+private String patientServiceUrl;
+
+@Value("${services.doctor.url:http://localhost:8082}")
+private String doctorServiceUrl;
 	
 	@Autowired
 	private AppointmentRepository repo;
@@ -98,21 +105,24 @@ public class AppointmentService {
 			headers.set(HttpHeaders.AUTHORIZATION, auth);
 			HttpEntity<Void> entity=new HttpEntity<>(headers);
 			String url="";
-			Patient pa=template.exchange
-					("http://localhost:8081/api/patients/" + p.getPatient_id()
-							,HttpMethod.GET
-							,entity,
-							Patient.class).getBody();
-			Doctor doc=template.exchange
-					("http://localhost:8082/api/doctors/" + p.getDoctor_id()
-							,HttpMethod.GET
-							,entity,
-							Doctor.class).getBody();
-			List<DoctorAvialability> availability=template.exchange
-					("http://localhost:8082/api/doctors/" + p.getDoctor_id()+"/availability"
-					,HttpMethod.GET
-					,entity,
-					 new ParameterizedTypeReference<List<DoctorAvialability>>() {}).getBody();
+			Patient pa = template.exchange(
+        patientServiceUrl + "/api/patients/" + p.getPatient_id(),
+        HttpMethod.GET,
+        entity,
+        Patient.class
+).getBody();
+			Doctor doc = template.exchange(
+        doctorServiceUrl + "/api/doctors/" + p.getDoctor_id(),
+        HttpMethod.GET,
+        entity,
+        Doctor.class
+).getBody();
+			List<DoctorAvialability> availability = template.exchange(
+        doctorServiceUrl + "/api/doctors/" + p.getDoctor_id() + "/availability",
+        HttpMethod.GET,
+        entity,
+        new ParameterizedTypeReference<List<DoctorAvialability>>() {}
+).getBody();
 			if(availability==null) {
 				throw new DoctorNotAvailableException("Doctor is not available");
 			}
@@ -129,11 +139,12 @@ public class AppointmentService {
 						avail.getEnd_time().isAfter(p.getAppointmentTime())) {
 					flag=1;
 					 url =
-					        "http://localhost:8082/api/doctors/"
-					        + p.getDoctor_id()
-					        + "/availability/"
-					        + avail.getId()
-					        + "/decrement";
+        doctorServiceUrl
+        + "/api/doctors/"
+        + p.getDoctor_id()
+        + "/availability/"
+        + avail.getId()
+        + "/decrement";
 
 					
 					break;

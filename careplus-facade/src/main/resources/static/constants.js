@@ -12,6 +12,7 @@ const API_URLS = Object.freeze({
         BASE: "/api/patients/create",
         BY_ID: (id) => `/api/patients/${encodeURIComponent(id)}`,
         MEDICAL_HISTORY: (id) => `/api/patients/${encodeURIComponent(id)}/medical-history`,
+        MEDICAL_RECORDS: "/api/patients/medical-records",
 		BY_PATIENT: (id) => `/api/patients/${encodeURIComponent(id)}/appointments`,
     }),
     DOCTORS: Object.freeze({
