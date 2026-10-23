@@ -190,11 +190,17 @@ if (jwt) {
     $("welcomeUser").textContent = "Signed in (restored for this tab)";
 } else {
     setSignedIn(false);
-    signInWithGoogleSession();
+    const googleError = new URLSearchParams(window.location.search).get("googleError");
+    if (googleError) {
+        history.replaceState(null, "", window.location.pathname);
+        showMessage("Your Google account is not registered in CarePlus. Sign in with username and password.", true);
+    } else {
+        signInWithGoogleSession();
+    }
 }
 
 /**
- * After Google sign-in, exchanges the Google session for a CarePlus JWT. When the Google email matches a
+ * After Google sign-in, exchanges the one-shot Google login cookie for a CarePlus JWT. When the Google email matches a
  * user in the database the user is signed in directly, with that user's username and role; otherwise the
  * username/password screen stays visible.
  */
@@ -202,9 +208,6 @@ async function signInWithGoogleSession() {
     try {
         const response = await fetch(`${getBaseUrl()}${API_URLS.AUTH.GOOGLE_TOKEN}`);
         if (!response.ok) {
-            if (response.status === 404) {
-                showMessage("Your Google account is not registered in CarePlus. Sign in with username and password.", true);
-            }
             return;
         }
         const login = await response.json();

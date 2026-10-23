@@ -29,6 +29,15 @@ public class SecurityConfig {
 	
 	@Autowired
 	CustomAuthRequestResolver resolver;
+
+	@Autowired
+	CookieAuthorizationRequestRepository authorizationRequestRepository;
+
+	@Autowired
+	NoOpAuthorizedClientRepository authorizedClientRepository;
+
+	@Autowired
+	GoogleLoginSuccessHandler googleSuccessHandler;
 	@Bean
 	public PasswordEncoder encoder() {
 		return new BCryptPasswordEncoder();
@@ -48,27 +57,29 @@ public class SecurityConfig {
 	@Bean
 	public SecurityFilterChain chain(HttpSecurity http) {
 		http.csrf(c->c.disable())
-		// The Google login is the gate to the UI and must be remembered between requests, so it lives in the
-		// session. STATELESS dropped it after the callback and sent the browser back to Google in a loop.
-		// API authorization still comes from the JWT that the sign-in screen gets from /api/auth/login.
+		// No HttpSession, so any instance behind the load balancer can serve any request. The Google
+		// authorization request travels in a signed cookie and the finished Google login is handed to the UI
+		// as a one-shot JWT cookie (see GoogleLoginSuccessHandler). API authorization comes from the JWT.
 		.sessionManagement(se->se.sessionCreationPolicy(
-				SessionCreationPolicy.IF_REQUIRED))
+				SessionCreationPolicy.STATELESS))
 		.authorizeHttpRequests(auth->auth
 		 .requestMatchers(
                  "/oauth2/**",
                  "/login/**",
-                 "/error"
+                 "/error",
+                 // The UI shell holds no data; without a session it cannot be gated, the API still needs a JWT.
+                 "/",
+                 "/index.html",
+                 "/index.js",
+                 "/app.js",
+                 "/constants.js",
+                 "/favicon.ico",
+                 "/css/**",
+                 "/js/**",
+                 "/api/auth/login",
+                 "/api/auth/google-token",
+                 "/logout"
              ).permitAll()
-		 .requestMatchers(
-	                "/index.html",
-	                "/index.js",
-	                "/app.js",
-	                "/constants.js",
-	                "/favicon.ico",
-	                "/css/**",
-	                "/js/**",
-	                "/api**"
-	            ).authenticated()
 		.requestMatchers("/api/admin")
 		.hasAnyRole("ADMIN")
 		.requestMatchers(
@@ -92,16 +103,19 @@ public class SecurityConfig {
 		.anyRequest()
 		.authenticated()).
 		oauth2Login(oauth -> oauth
-	            .authorizationEndpoint(endpoint ->
-	                endpoint.authorizationRequestResolver(resolver)
+	            .authorizationEndpoint(endpoint -> endpoint
+	                .authorizationRequestResolver(resolver)
+	                .authorizationRequestRepository(authorizationRequestRepository)
 	            )
-	            .defaultSuccessUrl("/", true)
+	            .authorizedClientRepository(authorizedClientRepository)
+	            .successHandler(googleSuccessHandler)
 	        )
 		.logout(logout -> logout
 	            .logoutUrl("/logout")
-	            .invalidateHttpSession(true)
+	            .invalidateHttpSession(false)
 	            .clearAuthentication(true)
-	            .deleteCookies("JSESSIONID")
+	            .deleteCookies(GoogleLoginSuccessHandler.COOKIE_NAME,
+	            		CookieAuthorizationRequestRepository.COOKIE_NAME)
 	            .logoutSuccessUrl("/oauth2/authorization/google")
 	            .permitAll()
 	        )	.addFilterBefore(jwtFilter, 
