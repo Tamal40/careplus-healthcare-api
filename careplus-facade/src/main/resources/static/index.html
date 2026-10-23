@@ -248,6 +248,202 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;p
         </div>
 
     </div>
+ <div class="card">
+    <h2>Upload Patients from CSV</h2>
+
+    <p class="small">
+        Expected columns: name,email,phone,date_of_birth,gender
+    </p>
+
+    <form id="patientUploadForm">
+        <div class="field">
+            <label for="patientCsvFile">Select CSV file</label>
+            <input
+                type="file"
+                id="patientCsvFile"
+                accept=".csv,text/csv"
+                required
+            />
+        </div>
+
+        <div class="row" style="margin-top:12px">
+            <button type="submit" id="uploadPatientsBtn">
+                Upload CSV
+            </button>
+        </div>
+    </form>
+
+    <div id="uploadStatus" class="notice hidden"></div>
+
+    <div id="uploadSummary" class="hidden">
+        <p>Total rows: <strong id="totalRows">0</strong></p>
+        <p>Imported: <strong id="importedRows">0</strong></p>
+        <p>Skipped: <strong id="skippedRows">0</strong></p>
+
+        <h3>Validation Errors</h3>
+        <ul id="uploadErrors"></ul>
+    </div>
+</div>
+
+<!-- Paginated Patient List -->
+<div class="card">
+    <h2>All Patients</h2>
+
+    <div class="row">
+        <div class="field">
+            <label for="patientPage">Page number (starts at 0)</label>
+            <input
+                type="number"
+                id="patientPage"
+                value="0"
+                min="0"
+            />
+        </div>
+
+        <div class="field">
+            <label for="patientLimit">Records per page</label>
+            <select id="patientLimit">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+
+        <button type="button" id="loadPatientsBtn">
+            Load Patients
+        </button>
+    </div>
+
+    <p id="patientPageInfo" class="small"></p>
+
+    <div style="overflow-x:auto">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Date of Birth</th>
+                    <th>Gender</th>
+                </tr>
+            </thead>
+            <tbody id="patientTableBody">
+                <tr>
+                    <td colspan="6">Click Load Patients to view records.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="row" style="margin-top:12px">
+        <button type="button" id="previousPatientsBtn" class="secondary">
+            Previous
+        </button>
+
+        <button type="button" id="nextPatientsBtn">
+            Next
+        </button>
+    </div>
+</div>
+<div class="card">
+    <h2>Upload Doctor from CSV</h2>
+
+    <p class="small">
+        Expected columns: name,email,specialization,active
+    </p>
+
+    <form id="doctorUploadForm">
+        <div class="field">
+            <label for="doctorCsvFile">Select CSV file</label>
+            <input
+                type="file"
+                id="doctorCsvFile"
+                accept=".csv,text/csv"
+                required
+            />
+        </div>
+
+        <div class="row" style="margin-top:12px">
+            <button type="submit" id="uploadDoctorsBtn">
+                Upload CSV
+            </button>
+        </div>
+    </form>
+
+    <div id="duploadStatus" class="notice hidden"></div>
+
+    <div id="duploadSummary" class="hidden">
+        <p>Total rows: <strong id="dtotalRows">0</strong></p>
+        <p>Imported: <strong id="dimportedRows">0</strong></p>
+        <p>Skipped: <strong id="dskippedRows">0</strong></p>
+
+        <h3>Validation Errors</h3>
+        <ul id="duploadErrors"></ul>
+    </div>
+</div>
+
+<!-- Paginated Doctor List -->
+<div class="card">
+    <h2>All Doctors</h2>
+
+    <div class="row">
+        <div class="field">
+            <label for="doctorPage">Page number (starts at 0)</label>
+            <input
+                type="number"
+                id="doctorPage"
+                value="0"
+                min="0"
+            />
+        </div>
+
+        <div class="field">
+            <label for="doctorLimit">Records per page</label>
+            <select id="doctorLimit">
+                <option value="5">5</option>
+                <option value="10" selected>10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+            </select>
+        </div>
+
+        <button type="button" id="loadDoctorsBtn">
+            Load Doctors
+        </button>
+    </div>
+
+    <p id="doctorPageInfo" class="small"></p>
+
+    <div style="overflow-x:auto">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Specialization</th>
+                    <th>Active</th>
+                </tr>
+            </thead>
+            <tbody id="doctorTableBody">
+                <tr>
+                    <td colspan="6">Click Load Doctors to view records.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="row" style="margin-top:12px">
+        <button type="button" id="previousDoctorsBtn" class="secondary">
+            Previous
+        </button>
+
+        <button type="button" id="nextDoctorsBtn">
+            Next
+        </button>
+    </div>
+ </div>
 </section>
 </div>
 <footer class="small" style="padding:8px 2px 24px">CarePlus learning UI · Development demo only; do not use real patient data.</footer>

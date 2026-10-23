@@ -54,10 +54,14 @@ async function apiRequest(path, options = {}) {
         throw new Error("Please log in first.");
     }
 
-    const headers = {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-    };
+	const isFormData = options.body instanceof FormData;
+
+	const headers = {
+	    ...(!isFormData
+	        ? { "Content-Type": "application/json" }
+	        : {}),
+	    ...(options.headers || {}),
+	};
 
     if (jwt && !isLoginRequest) {
         headers.Authorization = `Bearer ${jwt}`;
@@ -298,6 +302,339 @@ $("findPatientBtn").addEventListener("click", async () => {
     }
 });
 
+/* -------------------------------------------------------------------------- */
+/* Patient CSV Upload and Pagination                                          */
+/* -------------------------------------------------------------------------- */
+
+let currentPage = 0;
+let currentPageSize = 10;
+let totalPages = 0;
+
+// Upload CSV file
+$("patientUploadForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const fileInput = $("patientCsvFile");
+    const file = fileInput.files[0];
+
+    if (!file) {
+        showMessage("Please select a CSV file.", true);
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    $("uploadStatus").classList.remove("hidden");
+    $("uploadStatus").textContent = "Uploading CSV...";
+    $("uploadSummary").classList.add("hidden");
+
+    try {
+        const result = await apiRequest(
+            API_URLS.PATIENTS.UPLOAD_CSV,
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        $("uploadSummary").classList.remove("hidden");
+
+        $("totalRows").textContent = result.totalRows ?? 0;
+        $("importedRows").textContent = result.imported ?? 0;
+        $("skippedRows").textContent = result.skipped ?? 0;
+
+        const errorList = $("uploadErrors");
+        errorList.replaceChildren();
+
+        (result.errors ?? []).forEach((error) => {
+            const item = document.createElement("li");
+            item.textContent =
+                `Line ${error.line}: ${error.message}`;
+            errorList.appendChild(item);
+        });
+
+        $("uploadStatus").textContent = "CSV upload completed.";
+
+        // Refresh the patient list from the first page
+        currentPage = 0;
+        $("patientPage").value = 0;
+        await loadPatients();
+
+        fileInput.value = "";
+    } catch (error) {
+        $("uploadStatus").textContent = error.message;
+        showMessage(`CSV upload failed: ${error.message}`, true);
+    }
+});
+
+
+// Load patients for the selected page
+async function loadPatients() {
+    currentPage = Math.max(
+        0,
+        Number.parseInt($("patientPage").value, 10) || 0
+    );
+
+    currentPageSize = Number($("patientLimit").value) || 10;
+
+    try {
+        const result = await apiRequest(
+            `${API_URLS.PATIENTS.PAGED}?page=${currentPage}&size=${currentPageSize}`
+        );
+
+        const patients = result.content ?? [];
+        const tableBody = $("patientTableBody");
+
+        tableBody.replaceChildren();
+
+        if (patients.length === 0) {
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+
+            cell.colSpan = 6;
+            cell.textContent = "No patients found.";
+
+            row.appendChild(cell);
+            tableBody.appendChild(row);
+        } else {
+            patients.forEach((patient) => {
+                const row = document.createElement("tr");
+
+                const values = [
+                    patient.id,
+                    patient.name,
+                    patient.email,
+                    patient.phone,
+                    patient.date_of_birth ?? patient.dateOfBirth,
+                    patient.gender
+                ];
+
+                values.forEach((value) => {
+                    const cell = document.createElement("td");
+                    cell.textContent = value ?? "";
+                    row.appendChild(cell);
+                });
+
+                tableBody.appendChild(row);
+            });
+        }
+
+        totalPages = result.totalPages ?? 0;
+        currentPage = result.number ?? currentPage;
+        $("patientPage").value = currentPage;
+
+        $("patientPageInfo").textContent =
+            `Page ${totalPages === 0 ? 0 : currentPage + 1} of ${totalPages} | ` +
+            `Total patients: ${result.totalElements ?? 0}`;
+
+        $("previousPatientsBtn").disabled =
+            currentPage <= 0;
+
+        $("nextPatientsBtn").disabled =
+            totalPages === 0 || currentPage >= totalPages - 1;
+
+    } catch (error) {
+        showMessage(
+            `Could not load patients: ${error.message}`,
+            true
+        );
+    }
+}
+
+
+// Load button
+$("loadPatientsBtn").addEventListener("click", loadPatients);
+
+
+// Previous page
+$("previousPatientsBtn").addEventListener("click", async () => {
+    if (currentPage > 0) {
+        currentPage--;
+        $("patientPage").value = currentPage;
+        await loadPatients();
+    }
+});
+
+
+// Next page
+$("nextPatientsBtn").addEventListener("click", async () => {
+    if (currentPage < totalPages - 1) {
+        currentPage++;
+        $("patientPage").value = currentPage;
+        await loadPatients();
+    }
+});
+
+
+// Reset to page zero when page size changes
+$("patientLimit").addEventListener("change", async () => {
+    currentPage = 0;
+    $("patientPage").value = 0;
+    await loadPatients();
+});
+
+$("doctorUploadForm").addEventListener("submit", async (event) => {
+    event.preventDefault();
+
+    const fileInput = $("doctorCsvFile");
+    const file = fileInput.files[0];
+
+    if (!file) {
+        showMessage("Please select a CSV file.", true);
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    $("duploadStatus").classList.remove("hidden");
+    $("duploadStatus").textContent = "Uploading CSV...";
+    $("duploadSummary").classList.add("hidden");
+
+    try {
+        const result = await apiRequest(
+            API_URLS.DOCTORS.UPLOAD_CSV,
+            {
+                method: "POST",
+                body: formData
+            }
+        );
+
+        $("duploadSummary").classList.remove("hidden");
+
+        $("dtotalRows").textContent = result.totalRows ?? 0;
+        $("dimportedRows").textContent = result.imported ?? 0;
+        $("dskippedRows").textContent = result.skipped ?? 0;
+
+        const errorList = $("duploadErrors");
+        errorList.replaceChildren();
+
+        (result.errors ?? []).forEach((error) => {
+            const item = document.createElement("li");
+            item.textContent =
+                `Line ${error.line}: ${error.message}`;
+            errorList.appendChild(item);
+        });
+
+        $("duploadStatus").textContent = "CSV upload completed.";
+
+        // Refresh the patient list from the first page
+        currentPage = 0;
+        $("doctorPage").value = 0;
+        await loadDoctors();
+
+        fileInput.value = "";
+    } catch (error) {
+        $("duploadStatus").textContent = error.message;
+        showMessage(`CSV upload failed: ${error.message}`, true);
+    }
+});
+
+
+// Load patients for the selected page
+async function loadDoctors() {
+    currentPage = Math.max(
+        0,
+        Number.parseInt($("doctorPage").value, 10) || 0
+    );
+
+    currentPageSize = Number($("doctorLimit").value) || 10;
+
+    try {
+        const result = await apiRequest(
+            `${API_URLS.DOCTORS.PAGED}?page=${currentPage}&size=${currentPageSize}`
+        );
+
+        const doctors = result.content ?? [];
+        const tableBody = $("doctorTableBody");
+
+        tableBody.replaceChildren();
+
+        if (doctors.length === 0) {
+            const row = document.createElement("tr");
+            const cell = document.createElement("td");
+
+            cell.colSpan = 6;
+            cell.textContent = "No patients found.";
+
+            row.appendChild(cell);
+            tableBody.appendChild(row);
+        } else {
+            doctors.forEach((doctors) => {
+                const row = document.createElement("tr");
+
+                const values = [
+                    doctors.id,
+                    doctors.name,
+                    doctors.email,
+                    doctors.specialization,
+                    doctors.active
+                ];
+
+                values.forEach((value) => {
+                    const cell = document.createElement("td");
+                    cell.textContent = value ?? "";
+                    row.appendChild(cell);
+                });
+
+                tableBody.appendChild(row);
+            });
+        }
+
+        totalPages = result.totalPages ?? 0;
+        currentPage = result.number ?? currentPage;
+        $("doctorPage").value = currentPage;
+
+        $("doctorPageInfo").textContent =
+            `Page ${totalPages === 0 ? 0 : currentPage + 1} of ${totalPages} | ` +
+            `Total doctors: ${result.totalElements ?? 0}`;
+
+        $("previousDoctorsBtn").disabled =
+            currentPage <= 0;
+
+        $("nextDoctorsBtn").disabled =
+            totalPages === 0 || currentPage >= totalPages - 1;
+
+    } catch (error) {
+        showMessage(
+            `Could not load patients: ${error.message}`,
+            true
+        );
+    }
+}
+
+
+// Load button
+$("loadDoctorsBtn").addEventListener("click", loadDoctors);
+
+
+// Previous page
+$("previousDoctorsBtn").addEventListener("click", async () => {
+    if (currentPage > 0) {
+        currentPage--;
+        $("doctorPage").value = currentPage;
+        await loadDoctors();
+    }
+});
+
+
+// Next page
+$("nextDoctorsBtn").addEventListener("click", async () => {
+    if (currentPage < totalPages - 1) {
+        currentPage++;
+        $("doctorPage").value = currentPage;
+        await loadDoctors();
+    }
+});
+
+
+// Reset to page zero when page size changes
+$("doctorLimit").addEventListener("change", async () => {
+    currentPage = 0;
+    $("doctorPage").value = 0;
+    await loadDoctors();
+});
 /* -------------------------------------------------------------------------- */
 /* Doctors                                                                    */
 /* -------------------------------------------------------------------------- */

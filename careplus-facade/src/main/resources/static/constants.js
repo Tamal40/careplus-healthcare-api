@@ -14,12 +14,16 @@ const API_URLS = Object.freeze({
         MEDICAL_HISTORY: (id) => `/api/patients/${encodeURIComponent(id)}/medical-history`,
         MEDICAL_RECORDS: "/api/patients/medical-records",
 		BY_PATIENT: (id) => `/api/patients/${encodeURIComponent(id)}/appointments`,
+		UPLOAD_CSV: "/api/patients/upload",
+		PAGED: "/api/patients",
     }),
     DOCTORS: Object.freeze({
         BASE: "/api/doctors/create",
         BY_ID: (id) => `/api/doctors/${encodeURIComponent(id)}`,
         AVAILABILITY: (id) => `/api/doctors/${encodeURIComponent(id)}/availability`,
 	    BY_DOCTOR: (id) => `/api/doctors/${encodeURIComponent(id)}/appointments`,
+		UPLOAD_CSV: "/api/doctors/upload",
+		PAGED: "/api/doctors",
     }),
     APPOINTMENTS: Object.freeze({
         BASE: "/api/appointments",

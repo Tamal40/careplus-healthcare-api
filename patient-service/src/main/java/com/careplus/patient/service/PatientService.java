@@ -1,12 +1,25 @@
 package com.careplus.patient.service;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-
+import java.util.Set;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.Sort.Direction;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -15,18 +28,28 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.careplus.common.dto.Appointment;
 import com.careplus.common.dto.AppointmentDto;
+import com.careplus.common.dto.CsvUploadBatch;
+import com.careplus.common.dto.CsvUploadJob;
+import com.careplus.common.dto.CsvUploadRowError;
 import com.careplus.common.dto.Doctor;
+import com.careplus.common.dto.Gender;
+import com.careplus.common.dto.JobStatus;
 import com.careplus.common.dto.MedicalRecord;
 import com.careplus.common.dto.Patient;
 import com.careplus.common.dto.Prescription;
 import com.careplus.patient.dto.MedicalRecordRequest;
+import com.careplus.patient.dto.PatientUploadResponse;
 import com.careplus.patient.dto.PrescriptionRequest;
+import com.careplus.patient.dto.UploadError;
 import com.careplus.patient.exception.AppointmentNotFoundException;
 import com.careplus.patient.exception.PatientExistsException;
 import com.careplus.patient.exception.PatientNotFoundException;
+import com.careplus.patient.repository.CsvUploadBatchRepository;
+import com.careplus.patient.repository.CsvUploadRowErrorRepository;
 import com.careplus.patient.repository.MedicalRecordRepository;
 import com.careplus.patient.repository.PatientRepository;
 import com.careplus.patient.repository.PrescriptionRepository;
@@ -54,9 +77,16 @@ public class PatientService {
 	@Autowired
 	private EntityManager entityManager;
 	
+	@Autowired
+	private CsvUploadBatchRepository batchRepo;
+	
+	@Autowired
+	private CsvUploadRowErrorRepository errorRepo;
+	private static final int BATCH_SIZE = 10;
+	private static final int THREAD_COUNT = 3;
 	@Transactional
-	public List<Patient> getAllPatient(){
-		return repo.findAll();
+	public List<Patient> getAllPatient(int offset,int limit){
+		return repo.findAllPatients(offset,limit);
 	}
 
 	@Transactional
@@ -177,6 +207,262 @@ public List<MedicalRecordRequest> getMedicalHistory(Long id) {
 	}
 	return rec;
 	
+}
+
+private void validateHeader(String header) {
+
+    if (header == null || header.isBlank()) {
+        throw new IllegalArgumentException("CSV header is missing");
+    }
+
+    String expectedHeader =
+            "name,email,phone,date_of_birth,gender";
+
+    if (!header.trim().equalsIgnoreCase(expectedHeader)) {
+        throw new IllegalArgumentException(
+                "Invalid CSV header. Expected: " + expectedHeader
+        );
+    }
+}
+
+@Transactional
+public PatientUploadResponse uploadFile(CsvUploadJob job,MultipartFile file) {
+	
+	List<Patient> batch=new ArrayList<>(BATCH_SIZE);
+	Set<String> emails=new HashSet<>();
+	PatientUploadResponse response = new PatientUploadResponse();
+	int batchNumber = 0;
+	int batchTotalRows = 0;
+	int batchImportedRows = 0;
+	int batchSkippedRows = 0;
+
+	int batchStartRow = 2;
+	int endRow=0;
+	try(BufferedReader  reader=new BufferedReader(new
+			InputStreamReader(file.getInputStream()))){
+		String header=reader.readLine();
+		validateHeader(header);
+		String line;
+		int lineNumber=1;
+		while((line=reader.readLine())!=null){
+			lineNumber++;
+			endRow = lineNumber;
+			if(line.isBlank()) {
+				continue;
+			}
+			batchTotalRows++;
+			 response.incrementTotalRows();
+			try {
+				Patient p=parseAndValidate(line
+						,lineNumber,emails);
+				batch.add(p);
+				batchImportedRows++;
+				if(batch.size()==BATCH_SIZE) {
+					saveBatch(batch,response);
+				}
+			}catch(Exception ex) {
+
+                response.incrementSkipped();
+                batchSkippedRows++;
+                CsvUploadRowError error=new CsvUploadRowError();
+                error.setErrorMessage(ex.getMessage());
+                error.setJob(job);
+                error.setLineNumber(lineNumber);
+                errorRepo.save(error);
+                response.addError(
+                    new UploadError(lineNumber, ex.getMessage())
+                );
+			}
+			 if (!batch.isEmpty()) {
+	                saveBatch(batch, response);
+	            }
+			 CsvUploadBatch batchupload = new CsvUploadBatch();
+
+			 batchupload.setJobId(job);
+			 batchupload.setBatchNumber(batchNumber);
+			 batchupload.setStartRow(batchStartRow);
+			 batchupload.setEndRow(endRow);
+			 batchupload.setTotalRows(batchTotalRows);
+			 batchupload.setImportedRows(batchImportedRows);
+			 batchupload.setSkippedRows(batchSkippedRows);
+
+			 batchupload.setStatus(
+					 batchSkippedRows == 0
+			            ? JobStatus.COMPLETED
+			            : JobStatus.COMPLETED_WITH_ERRORS
+			    );
+
+			 batchupload.setStartedAt(LocalDateTime.now());
+			 batchupload.setCompletedAt(LocalDateTime.now());
+
+			    batchRepo.save(batchupload);
+			    batchStartRow = lineNumber + 1;
+			    batchNumber++;
+			    batchSkippedRows=0;
+		}
+		return response;
+	}
+	 catch (IOException ex) {
+         throw new RuntimeException("Unable to read CSV file", ex);
+     }
+}
+
+
+private void saveBatch(
+        List<Patient> batch,
+        PatientUploadResponse response) {
+
+    if (batch == null || batch.isEmpty()) {
+        return;
+    }
+
+    // Create a copy because the original batch may be cleared.
+    List<Patient> batchToSave = new ArrayList<>(batch);
+
+    ExecutorService executor =
+            Executors.newFixedThreadPool(THREAD_COUNT);
+
+    try {
+        Future<Integer> future = executor.submit(() -> {
+            repo.saveAll(batchToSave);
+            return batchToSave.size();
+        });
+
+        // Wait for the database save to complete.
+        int savedCount = future.get();
+
+        response.addImported(savedCount);
+
+    } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        CsvUploadBatch uploadbatch=new CsvUploadBatch();
+        uploadbatch.setStatus(JobStatus.FAILED);
+    	uploadbatch.setCreatedAt(LocalDateTime.now());
+    	uploadbatch.setErrorMessage("Batch save was interrupted");
+    	batchRepo.save(uploadbatch);
+        throw new RuntimeException("Batch save was interrupted", e);
+
+    } catch (ExecutionException e) {
+    	CsvUploadBatch uploadbatch=new CsvUploadBatch();
+    	uploadbatch.setStatus(JobStatus.FAILED);
+    	uploadbatch.setCreatedAt(LocalDateTime.now());
+    	uploadbatch.setErrorMessage("Failed to save patient batch");
+    	batchRepo.save(uploadbatch);
+        throw new RuntimeException("Failed to save patient batch", e);
+
+    } finally {
+        executor.shutdown();
+    }
+
+    batch.clear();
+}
+
+
+private Patient parseAndValidate(
+        String line,
+        int lineNumber,
+        Set<String> emailsInFile) {
+
+    String[] columns = line.split(",", -1);
+
+    if (columns.length != 5) {
+        throw new IllegalArgumentException(
+                "Expected 5 columns"
+        );
+    }
+
+    String name = columns[0].trim();
+    String email = columns[1].trim();
+    String phone = columns[2].trim();
+    String dobValue = columns[3].trim();
+    String genderValue = columns[4].trim();
+
+    if (name.isBlank()) {
+        throw new IllegalArgumentException("name is required");
+    }
+
+    if (email.isBlank()) {
+        throw new IllegalArgumentException("email is required");
+    }
+
+    if (phone.isBlank()) {
+        throw new IllegalArgumentException("phone is required");
+    }
+
+    if (dobValue.isBlank()) {
+        throw new IllegalArgumentException(
+                "date_of_birth is required"
+        );
+    }
+
+    LocalDate dob;
+
+    try {
+        dob = LocalDate.parse(dobValue);
+    } catch (DateTimeParseException ex) {
+        throw new IllegalArgumentException(
+                "invalid date_of_birth"
+        );
+    }
+
+    if (dob.isAfter(LocalDate.now())) {
+        throw new IllegalArgumentException(
+                "date_of_birth cannot be in the future"
+        );
+    }
+
+    Gender gender;
+
+    try {
+        gender = Gender.valueOf(
+                genderValue.toUpperCase()
+        );
+    } catch (IllegalArgumentException ex) {
+        throw new IllegalArgumentException(
+                "gender must be MALE or FEMALE"
+        );
+    }
+
+    if (gender != Gender.MALE &&
+        gender != Gender.FEMALE) {
+
+        throw new IllegalArgumentException(
+                "gender must be MALE or FEMALE"
+        );
+    }
+
+    /*
+     * Duplicate inside same CSV.
+     */
+    if (!emailsInFile.add(email.toLowerCase())) {
+        throw new IllegalArgumentException(
+                "duplicate email in file"
+        );
+    }
+
+    /*
+     * Duplicate already stored in MySQL.
+     */
+    if (!repo.findByEmail(email).isEmpty()) {
+        throw new IllegalArgumentException(
+                "email already exists"
+        );
+    }
+
+    Patient patient = new Patient();
+
+    patient.setName(name);
+    patient.setEmail(email);
+    patient.setPhone(phone);
+    patient.setDate_of_birth(dob);
+    patient.setGender(gender);
+
+    LocalDate today = LocalDate.now();
+
+    patient.setCreated_at(today);
+    patient.setUpdated_at(today);
+
+    return patient;
 }
 
 }
