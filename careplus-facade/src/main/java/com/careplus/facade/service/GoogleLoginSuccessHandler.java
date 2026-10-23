@@ -3,6 +3,7 @@ package com.careplus.facade.service;
 import java.io.IOException;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
@@ -23,7 +24,10 @@ public class GoogleLoginSuccessHandler implements AuthenticationSuccessHandler {
 	public static final String COOKIE_NAME = "CAREPLUS_GOOGLE_LOGIN";
 	private static final int MAX_AGE_SECONDS = 120;
 
+	// Lazy: SecurityConfig needs this handler, and AuthenticationService needs the AuthenticationManager
+	// bean that SecurityConfig defines. Resolving it on first use breaks that cycle.
 	@Autowired
+	@Lazy
 	private AuthenticationService authService;
 
 	@Override
