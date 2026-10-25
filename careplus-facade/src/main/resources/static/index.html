@@ -18,6 +18,22 @@ h2{font-size:18px;margin:0 0 14px}.grid{display:grid;grid-template-columns:repea
 #message{white-space:pre-wrap;margin-bottom:12px}.error{background:#fff0f0;color:#8e1b1b}.ok{background:#eaf8f0;color:#12633c}
 table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid var(--border);vertical-align:top}th{background:#f7f9fc;color:#475569}
 .hidden{display:none!important}.small{font-size:12px;color:var(--muted)}.pill{display:inline-block;background:#e8eef5;padding:4px 8px;border-radius:99px;font-size:12px}
+/* Chat assistant */
+.chatBox{display:flex;flex-direction:column;height:min(70vh,640px)}
+#chatMessages{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:12px;background:#f7f9fc;border:1px solid var(--border);border-radius:10px}
+.chatBubble{max-width:78%;padding:10px 12px;border-radius:14px;font-size:14px;line-height:1.4;white-space:pre-wrap;word-wrap:break-word}
+.chatBubble.user{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px}
+.chatBubble.bot{align-self:flex-start;background:#fff;border:1px solid var(--border);border-bottom-left-radius:4px}
+.chatBubble.error{align-self:flex-start;background:#fff0f0;color:#8e1b1b;border:1px solid #f3c9c9}
+.chatTools{margin-top:6px;font-size:11px;color:var(--muted)}
+.chatPending{align-self:flex-start;max-width:78%;background:#fffbea;border:1px solid #f0d98a;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.chatPendingSummary{font-size:14px;white-space:pre-wrap}
+#chatThinking{align-self:flex-start;font-size:13px;color:var(--muted);padding:4px 8px}
+#chatSuggestions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 0}
+.chatChip{font-weight:400;border-radius:99px;padding:7px 12px;font-size:13px}
+#chatForm{display:flex;gap:8px;margin-top:10px;align-items:flex-end}
+#chatForm textarea{min-height:44px;height:44px;resize:none}
+@media(max-width:600px){.chatBubble,.chatPending{max-width:92%}}
 @media(max-width:600px){header{padding:16px}main{padding:0 10px}.card{padding:13px}table{display:block;overflow-x:auto}}
 </style></head>
 <body>
@@ -57,7 +73,7 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;p
 </div>
 <div id="appShell" class="hidden">
 <section class="card" style="margin-bottom:16px"><div class="row" style="justify-content:space-between;align-items:center"><div><strong id="welcomeUser">Signed in</strong><div class="small">Authenticated requests use your JWT bearer token.</div></div><button id="logoutBtn" class="secondary">Logout</button></div></section>
-<nav><button class="tab active" data-tab="patients">Patients</button><button class="tab" data-tab="doctors">Doctors</button><button class="tab" data-tab="appointments">Appointments</button><button class="tab" data-tab="history">Medical history</button></nav>
+<nav><button class="tab active" data-tab="patients">Patients</button><button class="tab" data-tab="doctors">Doctors</button><button class="tab" data-tab="appointments">Appointments</button><button class="tab" data-tab="history">Medical history</button><button class="tab hidden" id="chatTab" data-tab="chat">Chat assistant</button></nav>
 <section id="patients" class="tabPanel"><div class="grid">
 <div class="card"><h2 id="patientFormTitle">Register patient</h2><form id="patientForm"><input type="hidden" id="patientId">
 <div class="field"><label for="patientName">Full name *</label><input id="patientName" required></div>
@@ -445,7 +461,18 @@ table{border-collapse:collapse;width:100%;font-size:13px}th,td{text-align:left;p
     </div>
  </div>
 </section>
+<section id="chat" class="tabPanel hidden">
+<div class="card chatBox">
+<div class="row" style="justify-content:space-between;align-items:center;margin-bottom:10px"><div><h2 style="margin:0">Chat assistant</h2><div class="small">Ask about doctor availability, and book, view or cancel your appointments. I cannot help with anything else.</div></div><button type="button" id="chatNew" class="secondary">New chat</button></div>
+<div id="chatMessages" role="log" aria-live="polite" aria-label="Chat messages"></div>
+<div id="chatThinking" class="hidden" aria-live="polite">Thinking...</div>
+<div id="chatSuggestions" aria-label="Suggested questions"></div>
+<form id="chatForm"><label for="chatInput" class="hidden">Your message</label><textarea id="chatInput" rows="1" maxlength="500" placeholder="Type your question..." autocomplete="off"></textarea><button type="submit" id="chatSend">Send</button></form>
+<p class="small" style="margin:8px 0 0">I never book or cancel without your confirmation. Do not enter real patient data.</p>
+</div>
+</section>
 </div>
 <footer class="small" style="padding:8px 2px 24px">CarePlus learning UI · Development demo only; do not use real patient data.</footer>
 </main><script src="constants.js"></script>
-<script src="app.js"></script></body></html>
+<script src="app.js"></script>
+<script src="js/chat.js"></script></body></html>

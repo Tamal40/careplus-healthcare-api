@@ -31,4 +31,8 @@ const API_URLS = Object.freeze({
         CANCEL: (id) => `/api/appointments/${encodeURIComponent(id)}/cancel`,
         COMPLETE: (id) => `/api/appointments/${encodeURIComponent(id)}/complete`,
     }),
+    CHAT: Object.freeze({
+        MESSAGE: "/api/chat",
+        CONFIRM: "/api/chat/confirm",
+    }),
 });
