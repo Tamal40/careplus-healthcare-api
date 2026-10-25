@@ -111,7 +111,12 @@ class PatientServiceTest {
 	@Test
 	void getAppointmentsMapsEachAppointment() {
 		Patient stored = patient("ada@example.com");
+		stored.setId(1L);
 		Appointment appointment = new Appointment();
+		appointment.setId(11L);
+		Doctor doctor = new Doctor();
+		doctor.setId(3L);
+		appointment.setDoctor(doctor);
 		appointment.setAppointmentDate(LocalDate.of(2026, 11, 2));
 		appointment.setAppointmentTime(LocalTime.of(10, 30));
 		appointment.setReason("Follow-up");
@@ -124,6 +129,10 @@ class PatientServiceTest {
 
 		assertThat(result).hasSize(1);
 		AppointmentDto dto = result.get(0);
+		// id and doctor_id let a client pick one appointment (e.g. to cancel it).
+		assertThat(dto.getId()).isEqualTo(11L);
+		assertThat(dto.getDoctor_id()).isEqualTo(3L);
+		assertThat(dto.getPatient_id()).isEqualTo(1L);
 		assertThat(dto.getAppointmentDate()).isEqualTo(LocalDate.of(2026, 11, 2));
 		assertThat(dto.getAppointmentTime()).isEqualTo(LocalTime.of(10, 30));
 		assertThat(dto.getReason()).isEqualTo("Follow-up");
@@ -287,6 +296,55 @@ class PatientServiceTest {
 		when(repo.findById(99L)).thenReturn(Optional.empty());
 
 		assertThatThrownBy(() -> service.getAppointments(99L)).isInstanceOf(PatientNotFoundException.class);
+	}
+
+	@Test
+	void getPatientByEmailReturnsThePatientBehindTheLogin() {
+		Patient stored = patient("ada@example.com");
+		when(repo.findByEmail("ada@example.com")).thenReturn(Optional.of(stored));
+
+		assertThat(service.getPatientByEmail(" ada@example.com ")).isSameAs(stored);
+	}
+
+	@Test
+	void getPatientByEmailThrowsNotFoundWhenNoPatientHasThatEmail() {
+		when(repo.findByEmail("nobody@example.com")).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.getPatientByEmail("nobody@example.com"))
+				.isInstanceOf(PatientNotFoundException.class);
+		assertThatThrownBy(() -> service.getPatientByEmail(" "))
+				.isInstanceOf(PatientNotFoundException.class);
+	}
+
+	@Test
+	void searchPatientsConvertsAgeRangeToBirthDateRange() {
+		LocalDate today = LocalDate.now();
+		when(repo.searchPatients(any(), any(), any(), any(), eq(0), eq(10))).thenReturn(List.of());
+
+		service.searchPatients("female", "  ada ", 50, 60, 0, 10);
+
+		// age >= 50: born on/before today-50y. age <= 60: born after today-61y.
+		verify(repo).searchPatients("FEMALE", "ada", today.minusYears(61).plusDays(1), today.minusYears(50), 0, 10);
+	}
+
+	@Test
+	void searchPatientsPassesNullsWhenFiltersAreMissing() {
+		when(repo.searchPatients(any(), any(), any(), any(), eq(0), eq(10))).thenReturn(List.of());
+
+		service.searchPatients(null, " ", null, null, 0, 10);
+
+		verify(repo).searchPatients(null, null, null, null, 0, 10);
+	}
+
+	@Test
+	void searchPatientsRejectsInvalidFilters() {
+		assertThatThrownBy(() -> service.searchPatients("other", null, null, null, 0, 10))
+				.isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+		assertThatThrownBy(() -> service.searchPatients(null, null, 60, 50, 0, 10))
+				.isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+		assertThatThrownBy(() -> service.searchPatients(null, null, -1, null, 0, 10))
+				.isInstanceOf(org.springframework.web.server.ResponseStatusException.class);
+		verify(repo, never()).searchPatients(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyInt(), org.mockito.ArgumentMatchers.anyInt());
 	}
 
 	private static Patient patient(String email) {

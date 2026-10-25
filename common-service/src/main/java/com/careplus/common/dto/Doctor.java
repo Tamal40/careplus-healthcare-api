@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -47,6 +48,9 @@ public class Doctor implements Serializable {
 	public void setAvailabilities(List<DoctorAvialability> availabilities) {
 		this.availabilities = availabilities;
 	}
+	 // Not part of the JSON: GET /api/doctors is open to patients and must not expose other patients' appointments.
+	 // In-process callers still use getAppointments(); appointment data is served by /api/doctors/{id}/appointments.
+	 @JsonIgnore
 	 @OneToMany(mappedBy = "doctor", fetch = FetchType.LAZY)
 		private List<Appointment> appointments = new ArrayList<>();
 		public List<Appointment> getAppointments() {

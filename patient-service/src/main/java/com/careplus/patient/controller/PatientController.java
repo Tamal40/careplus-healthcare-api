@@ -16,6 +16,7 @@ import com.careplus.patient.dto.PatientUploadResponse;
 import com.careplus.patient.dto.UploadJobResponse;
 import com.careplus.patient.exception.PatientExistsException;
 import com.careplus.patient.service.CsvUploadStatusService;
+import com.careplus.patient.service.PatientAccess;
 import com.careplus.patient.service.PatientCsvUploadService;
 import com.careplus.patient.service.PatientService;
 import org.springframework.http.HttpHeaders;
@@ -28,6 +29,9 @@ public class PatientController {
 	
 	@Autowired
 	private PatientService service;
+
+	@Autowired
+	private PatientAccess access;
 	
 	@Autowired
 	private PatientCsvUploadService uploadService;
@@ -37,14 +41,35 @@ public class PatientController {
 	
 	
 	@GetMapping
-	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
-	public List<Patient> getAllPatients(@RequestParam(defaultValue = "0",name = "page") int page,@RequestParam(defaultValue = "10",name = "limit") int limit){
-		return service.getAllPatient(page,limit);
+	// Listing (and filtering) patients exposes everyone's contact details, so it is not open to PATIENT.
+	@PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+	public List<Patient> getAllPatients(@RequestParam(defaultValue = "0",name = "page") int page,@RequestParam(defaultValue = "10",name = "limit") int limit,
+			@RequestParam(required = false, name = "gender") String gender,
+			@RequestParam(required = false, name = "name") String name,
+			@RequestParam(required = false, name = "minAge") Integer minAge,
+			@RequestParam(required = false, name = "maxAge") Integer maxAge){
+		if (gender == null && name == null && minAge == null && maxAge == null) {
+			return service.getAllPatient(page,limit);
+		}
+		return service.searchPatients(gender, name, minAge, maxAge, page, limit);
 	}
 	
+	/** Who am I: the patient record behind the JWT username (email). Lets other services learn the caller's patient id. */
+	@GetMapping("/me")
+	@PreAuthorize("hasRole('PATIENT')")
+	public ResponseEntity<java.util.Map<String, Object>> me(org.springframework.security.core.Authentication authentication){
+		Patient p = service.getPatientByEmail(authentication.getName());
+		java.util.Map<String, Object> body = new java.util.LinkedHashMap<>();
+		body.put("id", p.getId());
+		body.put("name", p.getName());
+		body.put("email", p.getEmail());
+		return ResponseEntity.ok(body);
+	}
+
 	@GetMapping("/{id}")
 	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
 	public ResponseEntity<Patient> getPatient(@PathVariable("id") Long id){
+		access.requireAccess(id);
 		// An unknown id throws PatientNotFoundException, which PatientExceptionHandler maps to 404.
 		return ResponseEntity.ok(service.getPatient(id));
 	}
@@ -59,6 +84,7 @@ public class PatientController {
 	@GetMapping("/{id}/appointments")
 	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
 	public ResponseEntity<List<AppointmentDto>> getAppointment(@PathVariable("id") Long id){
+		access.requireAccess(id);
 		// A read is 200 OK; this used to answer 201 Created. An unknown patient id is a 404 via the handler.
 		return ResponseEntity.ok(service.getAppointments(id));
 	}
@@ -79,6 +105,7 @@ public class PatientController {
 	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
 	public ResponseEntity<List<MedicalRecordRequest>> getMedicalRecord(@PathVariable("id") Long id
 			,  @RequestHeader(HttpHeaders.AUTHORIZATION) String auth) throws PatientExistsException{
+		  access.requireAccess(id);
 		  List<MedicalRecordRequest> response =
 	                service.getMedicalHistory(id);
 

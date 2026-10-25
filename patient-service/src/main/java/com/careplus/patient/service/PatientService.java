@@ -23,12 +23,14 @@ import org.springframework.data.domain.Sort.Direction;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 
 import com.careplus.common.dto.Appointment;
 import com.careplus.common.dto.AppointmentDto;
@@ -89,10 +91,49 @@ public class PatientService {
 		return repo.findAllPatients(offset,limit);
 	}
 
+	/**
+	 * Filtered listing. All filters are optional; age is derived from date_of_birth.
+	 * offset/limit keep the same meaning as in {@link #getAllPatient(int, int)}.
+	 */
+	@Transactional
+	public List<Patient> searchPatients(String gender, String name, Integer minAge, Integer maxAge, int offset, int limit){
+		String genderValue = null;
+		if (gender != null && !gender.isBlank()) {
+			try {
+				genderValue = Gender.valueOf(gender.trim().toUpperCase()).name();
+			} catch (IllegalArgumentException ex) {
+				throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "gender must be MALE or FEMALE");
+			}
+		}
+		if ((minAge != null && minAge < 0) || (maxAge != null && maxAge < 0)) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minAge and maxAge must not be negative");
+		}
+		if (minAge != null && maxAge != null && minAge > maxAge) {
+			throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "minAge must not be greater than maxAge");
+		}
+		LocalDate today = LocalDate.now();
+		// age >= minAge  <=>  born on or before (today - minAge years)
+		LocalDate dobTo = minAge == null ? null : today.minusYears(minAge);
+		// age <= maxAge  <=>  born after (today - (maxAge + 1) years)
+		LocalDate dobFrom = maxAge == null ? null : today.minusYears(maxAge + 1L).plusDays(1);
+		String nameValue = (name == null || name.isBlank()) ? null : name.trim();
+		return repo.searchPatients(genderValue, nameValue, dobFrom, dobTo, offset, limit);
+	}
+
 	@Transactional
 	public Patient getPatient(Long id) {
-		
+
 		return repo.findById(id).orElseThrow(() -> new PatientNotFoundException(id));
+	}
+
+	/** The patient behind a login: the patient whose email is the JWT username. */
+	@Transactional
+	public Patient getPatientByEmail(String email) {
+		if (email == null || email.isBlank()) {
+			throw new PatientNotFoundException("No patient record is linked to this login");
+		}
+		return repo.findByEmail(email.trim())
+				.orElseThrow(() -> new PatientNotFoundException("No patient record is linked to this login"));
 	}
 	
 @Transactional
@@ -113,6 +154,10 @@ public List<AppointmentDto> getAppointments(Long id) {
 	List<AppointmentDto> appt=new ArrayList<>();
 	for(Appointment a:app) {
 		AppointmentDto ap=new AppointmentDto();
+		// id and doctor_id let a client pick one appointment, e.g. to cancel it.
+		ap.setId(a.getId());
+		ap.setPatient_id(p.getId());
+		ap.setDoctor_id(a.getDoctor() != null ? a.getDoctor().getId() : null);
 		ap.setAppointmentDate(a.getAppointmentDate());
 		ap.setAppointmentTime(a.getAppointmentTime());
 		ap.setReason(a.getReason());

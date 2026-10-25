@@ -29,4 +29,18 @@ public class JwtService {
 				.getPayload();
 	}
 
+	/**
+	 * A one-minute token for service-to-service calls (role SERVICE). The appointment service uses it to change a
+	 * doctor's slot capacity, which no user role may do directly.
+	 */
+	public String generateServiceToken() {
+		return Jwts.builder()
+				.subject("appointment-service")
+				.claim("role", "SERVICE")
+				.issuedAt(new java.util.Date())
+				.expiration(new java.util.Date(System.currentTimeMillis() + 60_000L))
+				.signWith(getSigningKey())
+				.compact();
+	}
+
 }

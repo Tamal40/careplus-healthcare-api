@@ -32,9 +32,15 @@ public class DoctorController {
 	
 	
 	@GetMapping
-	@PreAuthorize("hasAnyRole( 'DOCTOR', 'ADMIN')")
-	public List<Doctor> getAllDoctor(@RequestParam(defaultValue = "0",name = "page") int page,@RequestParam(defaultValue = "10",name = "limit") int limit){
-		return service.getAllDoctor(page,limit);
+	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
+	public List<Doctor> getAllDoctor(@RequestParam(defaultValue = "0",name = "page") int page,@RequestParam(defaultValue = "10",name = "limit") int limit,
+			@RequestParam(required = false, name = "specialization") String specialization,
+			@RequestParam(required = false, name = "name") String name,
+			@RequestParam(required = false, name = "active") Boolean active){
+		if (specialization == null && name == null && active == null) {
+			return service.getAllDoctor(page,limit);
+		}
+		return service.searchDoctors(specialization, name, active, page, limit);
 	}
 	
 	@PostMapping(value="/upload",consumes=MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -51,7 +57,7 @@ public class DoctorController {
 	}
 	
 	@GetMapping("/{id}")
-	@PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
+	@PreAuthorize("hasAnyRole('PATIENT', 'DOCTOR', 'ADMIN')")
 	public ResponseEntity<Doctor> getDoctor(@PathVariable("id") Long id){
 		Doctor p1=service.getDoctor(id);
 		if(p1==null) {
@@ -83,7 +89,8 @@ public class DoctorController {
 	}
 	
 	@PostMapping("/{id}/availability")
-	@PreAuthorize("hasAnyRole( 'PATIENT','DOCTOR', 'ADMIN')")
+	// Creating availability is for doctors and admins only; a patient must not be able to open slots.
+	@PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN')")
 	public ResponseEntity<DoctorAvailable> createDoctorAvailability(@PathVariable("id") Long id,@RequestBody DoctorAvialability avail) throws DoctorExistsException, DoctorNotAvailableException{
 		Doctor p1=service.getDoctor(id);
 		if(p1==null) {
@@ -99,7 +106,9 @@ public class DoctorController {
 	@PutMapping(
 		    "/{doctorId}/availability/{availabilityId}/decrement"
 		)
-	@PreAuthorize("hasAnyRole( 'PATIENT','DOCTOR', 'ADMIN')")
+	// Slot capacity is changed by the appointment service (role SERVICE) when it books or cancels, or by staff.
+	// Never by a patient: that would let them open or close slots directly.
+	@PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'SERVICE')")
 		public ResponseEntity<Void> decrementAvailability(
 		        @PathVariable("doctorId") Long doctorId,
 		        @PathVariable("availabilityId") Long availabilityId) {
@@ -114,7 +123,9 @@ public class DoctorController {
 	@PutMapping(
 		    "/{doctorId}/availability/{availabilityId}/increment"
 		)
-	@PreAuthorize("hasAnyRole( 'PATIENT','DOCTOR', 'ADMIN')")
+	// Slot capacity is changed by the appointment service (role SERVICE) when it books or cancels, or by staff.
+	// Never by a patient: that would let them open or close slots directly.
+	@PreAuthorize("hasAnyRole('DOCTOR', 'ADMIN', 'SERVICE')")
 		public ResponseEntity<Void> incrementAvailability(
 		        @PathVariable("doctorId") Long doctorId,
 		        @PathVariable("availabilityId") Long availabilityId) {

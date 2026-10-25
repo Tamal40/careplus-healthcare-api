@@ -22,7 +22,7 @@ public class SecurityConfig {
 		return http.csrf(c->c.disable())
 		.sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 		  .authorizeHttpRequests(
-				  auth->auth.requestMatchers("/api/doctors/**").hasAnyRole("DOCTOR","ADMIN","PATIENT")
+				  auth->auth.requestMatchers("/api/doctors/**").hasAnyRole("DOCTOR","ADMIN","PATIENT","SERVICE")
 				  .requestMatchers(
 			                "/",
 			                "/index.html",
