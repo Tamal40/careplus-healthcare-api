@@ -50,6 +50,14 @@ public class DoctorService {
 		return repo.findAllDoctors(offset,limit);
 	}
 
+	/** Filtered listing. All filters are optional; offset/limit mean the same as in {@link #getAllDoctor(int, int)}. */
+	@Transactional
+	public List<Doctor> searchDoctors(String specialization, String name, Boolean active, int offset, int limit){
+		String specializationValue = (specialization == null || specialization.isBlank()) ? null : specialization.trim();
+		String nameValue = (name == null || name.isBlank()) ? null : name.trim();
+		return repo.searchDoctors(specializationValue, nameValue, active, offset, limit);
+	}
+
 	@Transactional
 	public Doctor getDoctor(Long id) {
 		

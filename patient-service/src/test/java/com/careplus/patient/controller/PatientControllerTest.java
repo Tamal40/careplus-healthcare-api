@@ -29,6 +29,7 @@ import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import com.careplus.common.dto.AppointmentDto;
 import com.careplus.patient.exception.PatientExceptionHandler;
 import com.careplus.patient.exception.PatientNotFoundException;
+import com.careplus.patient.service.PatientAccess;
 import com.careplus.patient.service.PatientService;
 
 /**
@@ -40,6 +41,9 @@ class PatientControllerTest {
 
 	@Mock
 	private PatientService service;
+
+	@Mock
+	private PatientAccess access;
 
 	@InjectMocks
 	private PatientController controller;
@@ -71,6 +75,55 @@ class PatientControllerTest {
 				.andExpect(status().isNotFound())
 				.andExpect(jsonPath("$.status", is(404)))
 				.andExpect(jsonPath("$.message", is("Patient 99 not found")));
+	}
+
+	@Test
+	void anotherPatientsRecordsAreA403AndNothingIsLoaded() throws Exception {
+		org.mockito.Mockito.doThrow(new org.springframework.security.access.AccessDeniedException("You can only access your own patient record"))
+				.when(access).requireAccess(7L);
+
+		mvc.perform(get("/api/patients/7")).andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.status", is(403)));
+		mvc.perform(get("/api/patients/7/appointments")).andExpect(status().isForbidden());
+		mvc.perform(get("/api/patients/7/medical-history").header(HttpHeaders.AUTHORIZATION, "Bearer t"))
+				.andExpect(status().isForbidden());
+
+		verify(service, never()).getPatient(any());
+		verify(service, never()).getAppointments(any());
+		verify(service, never()).getMedicalHistory(any());
+	}
+
+	@Test
+	void allowedReadsCheckAccessForTheRequestedPatient() throws Exception {
+		when(service.getAppointments(1L)).thenReturn(List.of(new AppointmentDto()));
+
+		mvc.perform(get("/api/patients/1/appointments")).andExpect(status().isOk());
+
+		verify(access).requireAccess(1L);
+	}
+
+	@Test
+	void meReturnsTheIdOfThePatientBehindTheLogin() throws Exception {
+		com.careplus.common.dto.Patient p = new com.careplus.common.dto.Patient();
+		p.setId(5L);
+		p.setName("Ada");
+		p.setEmail("ada@example.com");
+		when(service.getPatientByEmail("ada@example.com")).thenReturn(p);
+
+		mvc.perform(get("/api/patients/me")
+						.principal(new org.springframework.security.authentication.TestingAuthenticationToken("ada@example.com", null, "ROLE_PATIENT")))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.id", is(5)))
+				.andExpect(jsonPath("$.email", is("ada@example.com")));
+	}
+
+	@Test
+	void meIs404WhenNoPatientIsLinkedToTheLogin() throws Exception {
+		when(service.getPatientByEmail("x@example.com")).thenThrow(new PatientNotFoundException("No patient record is linked to this login"));
+
+		mvc.perform(get("/api/patients/me")
+						.principal(new org.springframework.security.authentication.TestingAuthenticationToken("x@example.com", null, "ROLE_PATIENT")))
+				.andExpect(status().isNotFound());
 	}
 
 	@Test

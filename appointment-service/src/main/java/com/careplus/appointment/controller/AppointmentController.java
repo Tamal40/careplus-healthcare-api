@@ -22,8 +22,10 @@ public class AppointmentController {
 	
 	@GetMapping("/{id}")
 	@PreAuthorize("hasAnyRole('PATIENT','DOCTOR', 'ADMIN')")
-	public ResponseEntity<AppointmentDto> getAppointment(@PathVariable("id") Long id){
-		AppointmentDto p1=service.getAppointment(id);
+	public ResponseEntity<AppointmentDto> getAppointment(@PathVariable("id") Long id,
+			 @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization){
+		// A PATIENT gets only their own appointment (403 otherwise), decided from the login in the JWT.
+		AppointmentDto p1=service.getAppointment(id, authorization);
 		if(p1==null) {
 			AppointmentDto p=new AppointmentDto();
 			return new ResponseEntity<AppointmentDto>(p,HttpStatusCode.valueOf(404));
@@ -46,9 +48,12 @@ public class AppointmentController {
 			 @RequestHeader(HttpHeaders.AUTHORIZATION) String authorization) throws AppointmentExistsException, DoctorNotAvailableException{
 		
 		Appointment app=service.cancelAppointment(id, authorization);
+		if (app == null) {
+			return new ResponseEntity<Appointment>(HttpStatusCode.valueOf(404));
+		}
 		return new ResponseEntity<Appointment>(app,HttpStatusCode.valueOf(200));
 	}
-	
+
 	@PutMapping("/{id}/complete")
 	@PreAuthorize("hasAnyRole('PATIENT','DOCTOR', 'ADMIN')")
 	public ResponseEntity<Appointment> completeAppointment(@PathVariable("id") Long id,

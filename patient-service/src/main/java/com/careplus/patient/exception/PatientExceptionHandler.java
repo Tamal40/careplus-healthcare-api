@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -38,6 +39,12 @@ public class PatientExceptionHandler {
 	@ExceptionHandler(AppointmentNotFoundException.class)
 	public ResponseEntity<ErrorResponse> appointmentNotFound(AppointmentNotFoundException ex) {
 		return error(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
+
+	/** The caller is signed in but may not see this patient (see PatientAccess). */
+	@ExceptionHandler(AccessDeniedException.class)
+	public ResponseEntity<ErrorResponse> accessDenied(AccessDeniedException ex) {
+		return error(HttpStatus.FORBIDDEN, ex.getMessage());
 	}
 
 	/** A request body that is not valid JSON, or does not fit the target type, e.g. a malformed date. */

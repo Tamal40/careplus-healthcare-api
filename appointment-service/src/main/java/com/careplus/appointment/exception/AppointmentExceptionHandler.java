@@ -27,4 +27,11 @@ public class AppointmentExceptionHandler {
 				body(Map.of("ERROR", "DOCTOR NOT FOUND"));
 	}
 
+	/** The caller is signed in but may not touch this appointment (a patient and someone else's appointment). */
+	@ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+	public ResponseEntity<Map<String, String>> accessDenied(org.springframework.security.access.AccessDeniedException ex) {
+		return ResponseEntity.status(HttpStatus.FORBIDDEN).
+				body(Map.of("ERROR", ex.getMessage()));
+	}
+
 }
