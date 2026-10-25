@@ -94,7 +94,7 @@ Build and test each tool with an MCP inspector or `curl` before adding a model. 
 | `prepare_booking(doctorId, date, time, reason)` | checks the slot really exists and has capacity, returns a summary and a `pendingId`. **Does not book.** |
 | `prepare_cancel(appointmentId)` | checks the appointment is the caller's and `BOOKED`, returns a summary and a `pendingId`. **Does not cancel.** |
 
-Executing a pending action (`POST /api/appointments`, `PUT .../cancel`) is **not a tool**. It is a separate endpoint `POST /api/chat/confirm {pendingId}` that the UI calls when the patient clicks **Confirm**. This keeps the final write under the patient's control instead of the model's.
+Executing a pending action (`POST /api/appointments`, `PUT .../cancel`) is **not a tool**. It is a separate endpoint `POST /api/chat/confirm { pendingId, confirm }` that the UI calls when the patient clicks **Confirm** (or **Cancel**, with `confirm: false`). This keeps the final write under the patient's control instead of the model's.
 
 Rules in the tool code:
 - Reject bad input (past dates, unknown doctor, other people's appointments) with a clear message, not an exception.
@@ -115,13 +115,21 @@ Rules in the tool code:
 
 Pipeline: load -> chunk -> embed -> store with metadata `{type, doctorId}` -> retrieve top-k -> put in the prompt. Start with Spring AI `SimpleVectorStore` (in memory), then move to Qdrant, Chroma or pgvector (Docker) and note what changed. Expose it as a tool, `search_knowledge(query)`; "I have chest pain, who should I see?" should map to a specialization and then call `find_doctors`. The model suggests a *specialty*, never a diagnosis.
 
-## 7. Phase 3: chat UI
+## 7. Phase 3: chat UI (already provided)
 
-Add a **Chat** tab to `careplus-facade/src/main/resources/static/index.html`, logic in `app.js`, route in `constants.js` (`API_URLS.CHAT`, `API_URLS.CHAT_CONFIRM`). Show only to PATIENT users.
-- message list, input, send, "thinking..." state;
-- when the response has a `pendingAction`, show its summary with **Confirm** and **Cancel** buttons;
-- same 401/403 handling as the rest of the UI;
-- render model text with `textContent`, never `innerHTML`.
+The chat screen is built, so you do not write UI code. It is the **Chat assistant** tab in `careplus-facade/src/main/resources/static/index.html`, with the logic in `static/js/chat.js` and the routes in `constants.js` (`API_URLS.CHAT`). It is shown to PATIENT users only.
+
+What it expects from your chat service (through the facade):
+
+| Call | Sends | Gets back |
+|---|---|---|
+| `POST /api/chat` | `{ message, conversationId }` | `{ answer, toolsUsed?: string[], pendingAction?: { pendingId, type: "BOOK" or "CANCEL", summary } }` |
+| `POST /api/chat/confirm` | `{ pendingId, confirm }` (`true` runs the action, `false` discards it) | `{ answer }` |
+
+- When `pendingAction` is present the screen shows its `summary` with **Confirm** and **Cancel** buttons. Nothing is booked or cancelled before Confirm.
+- Open the UI with `?mockChat=1` to see the screen with fake answers before your backend exists.
+- The screen shows all server text with `textContent` (never `innerHTML`). Keep `answer` plain text.
+- You still need to add the `/api/chat` route to the facade (`RouteResolver`, `ServiceProperties`, `SecurityConfig`), and to the facade's static-file allowlist if you add new files outside `/js/**`.
 
 ## 8. Acceptance tests
 
@@ -153,7 +161,7 @@ Run as a PATIENT with the sample data loaded; record each in `docs/chatbot-test-
 | 1 | MCP server: `find_doctors`, `get_availability`, tested without an LLM | 1 day |
 | 2 | `list_my_appointments`, `get_appointment`, `prepare_booking`, `prepare_cancel`, confirm endpoint | 1-2 days |
 | 3 | Chat service + agent loop + facade route | 1-2 days |
-| 4 | Chat UI with Confirm | 1 day |
+| 4 | Connect the provided chat screen (`/api/chat`, `/api/chat/confirm`) | 0.5 day |
 | 5 | RAG + vector DB | 1-2 days |
 | 6 | Tests, README, test log | 1 day |
 
